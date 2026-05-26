@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Environment variables (contains API keys and secrets)
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploaded files (user data)
+server/uploads/*
+
+# Logs
+*.log
+npm-debug.log*
+
+# Prisma generated client (regenerated on install)
+node_modules/.prisma/
+
+# Vite cache
+client/node_modules/.vite/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Claude Code internal files
+.claude/
+
+# Design docs (internal only)
+docs/

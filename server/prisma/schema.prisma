@@ -1,0 +1,146 @@
+/**
+ * Prisma Schema — AI 知识库管理平台
+ *
+ * 数据库：PostgreSQL + pgvector 扩展
+ * 命名约定：数据库字段 snake_case（@map 映射），TypeScript 模型 camelCase
+ *
+ * pgvector 向量维度 1536，对应阿里云百炼 text-embedding-v2 模型输出维度。
+ */
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector", schema: "public")]
+}
+
+// ==================== User ====================
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  username     String   @unique
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  knowledgeBases KnowledgeBase[]
+  chatSessions   ChatSession[]
+
+  @@map("user")
+}
+
+// ==================== Knowledge Base ====================
+
+model KnowledgeBase {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  description  String?
+  systemPrompt String?  @map("system_prompt")
+  userId       String   @map("user_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries  KnowledgeEntry[]
+  sessions ChatSession[]
+
+  @@map("knowledge_base")
+}
+
+// ==================== Knowledge Entry ====================
+
+model KnowledgeEntry {
+  id               String           @id @default(uuid()) @db.Uuid
+  kbId             String           @map("kb_id") @db.Uuid
+  title            String
+  content          String           @db.Text
+  type             EntryType        @default(MANUAL)
+  status           EntryStatus      @default(ENABLED)
+  processingStatus ProcessingStatus @default(PENDING) @map("processing_status")
+  sourceFileName   String?          @map("source_file_name")
+  sourceFileHash   String?          @map("source_file_hash")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  kb     KnowledgeBase    @relation(fields: [kbId], references: [id], onDelete: Cascade)
+  chunks KnowledgeChunk[]
+
+  @@index([kbId, status])
+  @@map("knowledge_entry")
+}
+
+enum EntryType {
+  MANUAL
+  FILE
+}
+
+enum EntryStatus {
+  ENABLED
+  DISABLED
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ==================== Knowledge Chunk ====================
+
+model KnowledgeChunk {
+  id         String   @id @default(uuid()) @db.Uuid
+  entryId    String   @map("entry_id") @db.Uuid
+  chunkIndex Int      @map("chunk_index")
+  content    String   @db.Text
+  embedding  Unsupported("vector(1536)")
+  hitCount   Int      @default(0) @map("hit_count")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  entry KnowledgeEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([entryId])
+  @@map("knowledge_chunk")
+}
+
+// ==================== Chat ====================
+
+model ChatSession {
+  id        String   @id @default(uuid()) @db.Uuid
+  kbId      String   @map("kb_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  title     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  kb       KnowledgeBase @relation(fields: [kbId], references: [id], onDelete: Cascade)
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([userId, kbId])
+  @@map("chat_session")
+}
+
+model ChatMessage {
+  id         String      @id @default(uuid()) @db.Uuid
+  sessionId  String      @map("session_id") @db.Uuid
+  role       MessageRole
+  content    String      @db.Text
+  references Json?
+  tokenUsage Json?       @map("token_usage")
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("chat_message")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}

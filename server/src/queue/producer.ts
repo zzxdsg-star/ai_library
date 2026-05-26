@@ -1,0 +1,39 @@
+import amqp, { type Channel } from 'amqplib';
+import { config } from '../config';
+
+const QUEUE_NAME = 'document_processing';
+
+let connection: amqp.ChannelModel | null = null;
+let channel: Channel | null = null;
+
+async function getChannel(): Promise<Channel> {
+  if (!channel) {
+    connection = await amqp.connect(config.rabbitmqUrl);
+    channel = await connection.createChannel();
+    await channel.assertQueue(QUEUE_NAME, { durable: true });
+    console.log('[RabbitMQ] Producer connected, queue:', QUEUE_NAME);
+  }
+  return channel;
+}
+
+/**
+ * 发布文档处理任务到 RabbitMQ。
+ * 消息持久化，确保服务重启不丢失。
+ */
+export async function publishDocumentProcessing(
+  entryId: string,
+  filePath: string,
+): Promise<void> {
+  const ch = await getChannel();
+  ch.sendToQueue(
+    QUEUE_NAME,
+    Buffer.from(JSON.stringify({ entryId, filePath })),
+    { persistent: true },
+  );
+  console.log(`[RabbitMQ] Published job for entry: ${entryId}`);
+}
+
+export async function closeQueue(): Promise<void> {
+  if (channel) await channel.close();
+  if (connection) await connection.close();
+}
