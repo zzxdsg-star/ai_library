@@ -21,9 +21,6 @@ build/
 .DS_Store
 Thumbs.db
 
-# Uploaded files (user data)
-server/uploads/*
-
 # Logs
 *.log
 npm-debug.log*

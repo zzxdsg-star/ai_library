@@ -1,15 +1,19 @@
-import fs from 'fs/promises';
 import crypto from 'crypto';
+import iconv from 'iconv-lite';
 
 /**
  * 文档解析器：支持 PDF、Word (docx)、Markdown、纯文本。
  *
- * pdf-parse 提取 PDF 文本，mammoth 提取 Word 文本（去格式），
- * Markdown/纯文本直接按 UTF-8 读取。
+ * 接收 Buffer 而非文件路径——配合 multer.memoryStorage()，
+ * 文档二进制数据在内存中完成解析，不落盘。
+ *
+ * 中文编码处理：先尝试 UTF-8，若出现乱码特征则回退 GBK。
  */
-export async function parseDocument(filePath: string): Promise<string> {
-  const ext = filePath.split('.').pop()?.toLowerCase();
-  const buffer = await fs.readFile(filePath);
+export async function parseDocumentBuffer(
+  buffer: Buffer,
+  fileName: string,
+): Promise<string> {
+  const ext = fileName.split('.').pop()?.toLowerCase();
 
   if (ext === 'pdf') {
     const pdf = await import('pdf-parse');
@@ -24,17 +28,26 @@ export async function parseDocument(filePath: string): Promise<string> {
   }
 
   if (ext === 'md' || ext === 'txt') {
-    return buffer.toString('utf-8');
+    return decodeChineseText(buffer);
   }
 
   throw new Error(`Unsupported file type: .${ext}`);
 }
 
 /**
- * 计算文件 SHA256 哈希，用于去重校验。
- * 相同 hash 的文件不重复入库。
+ * 中文文本解码：UTF-8 优先，乱码时回退 GBK。
  */
-export async function computeFileHash(filePath: string): Promise<string> {
-  const buffer = await fs.readFile(filePath);
+function decodeChineseText(buffer: Buffer): string {
+  const utf8Text = buffer.toString('utf-8');
+  if (!utf8Text.includes('�')) {
+    return utf8Text;
+  }
+  return iconv.decode(buffer, 'gbk');
+}
+
+/**
+ * 计算 Buffer 的 SHA256 哈希，用于去重校验。
+ */
+export function computeBufferHash(buffer: Buffer): string {
   return crypto.createHash('sha256').update(buffer).digest('hex');
 }

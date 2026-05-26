@@ -1,12 +1,14 @@
 import { Router, Response, NextFunction } from 'express';
-import fs from 'fs/promises';
 import multer from 'multer';
 import { PrismaClient } from '@prisma/client';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 import { knowledgeService } from '../services/knowledge.service';
 import { AppError } from '../errors/app-error';
 import { ErrorCodes } from '../errors/error-codes';
-import { computeFileHash } from '../ingestion/parser';
+import {
+  parseDocumentBuffer,
+  computeBufferHash,
+} from '../ingestion/parser';
 import { publishDocumentProcessing } from '../queue/producer';
 
 const prisma = new PrismaClient();
@@ -15,15 +17,11 @@ const router = Router();
 router.use(authMiddleware);
 
 /**
- * Multer 配置：文件存入 server/uploads/ 目录，限制 20MB，
+ * Multer 配置：内存存储（不落盘），限制 20MB，
  * 仅允许 PDF、Word、Markdown、纯文本。
  */
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: 'uploads/',
-    filename: (_req, file, cb) =>
-      cb(null, `${Date.now()}-${file.originalname}`),
-  }),
+  storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     const allowed = [
@@ -32,7 +30,10 @@ const upload = multer({
       'text/markdown',
       'text/plain',
     ];
-    if (allowed.includes(file.mimetype) || file.originalname.endsWith('.md')) {
+    if (
+      allowed.includes(file.mimetype) ||
+      file.originalname.endsWith('.md')
+    ) {
       cb(null, true);
     } else {
       cb(
@@ -100,7 +101,14 @@ router.delete('/:id', async (req: AuthRequest, res: Response, next: NextFunction
 router.post('/:id/entries', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { title, content } = req.body;
-    const entry = await knowledgeService.createEntry(req.params.id as string, req.user!.id, title, content);
+    const entry = await knowledgeService.createEntry(
+      req.params.id as string,
+      req.user!.id,
+      title,
+      content,
+    );
+    // 手动录入的条目也走异步 embedding 管线
+    await publishDocumentProcessing(entry.id);
     res.json({ code: 0, data: entry, message: 'ok' });
   } catch (e) {
     next(e);
@@ -165,11 +173,26 @@ router.patch('/:id/entries/:eid/status', async (req: AuthRequest, res: Response,
 });
 
 /**
- * POST /:id/entries/upload — 文档上传 + 异步入库。
+ * 修复 multer/busboy 对中文文件名的 Latin-1 误读。
+ * 将 JS 字符串按 Latin-1 还原为原始字节 → UTF-8 重新解码。
+ */
+function decodeFilename(name: string): string {
+  try {
+    const bytes = Buffer.from(name, 'latin1');
+    const utf8 = bytes.toString('utf-8');
+    if (!utf8.includes('�') && utf8 !== name) {
+      return utf8;
+    }
+  } catch { /* ignore */ }
+  return name;
+}
+
+/**
+ * POST /:id/entries/upload — 文档上传 + 内存解析 + 异步入库。
  *
- * 流程：上传文件 → SHA256 去重 → 创建 entry(PENDING) →
- * 发布 RabbitMQ 消息 → Consumer 异步分块+Embedding → 更新状态。
- * 前端轮询 GET /entries/:eid 获取 processing_status 变化。
+ * 流程：上传 → 内存解析文本 → SHA256 去重 → 创建 entry（含原文）→
+ * 发布 RabbitMQ（仅 entryId）→ Consumer 分块+Embedding → COMPLETED/FAILED。
+ * 文件不落盘，全程在内存中处理。
  */
 router.post('/:id/entries/upload', upload.single('file'), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -178,15 +201,15 @@ router.post('/:id/entries/upload', upload.single('file'), async (req: AuthReques
     }
 
     const kbId = req.params.id as string;
-    const filePath = req.file.path;
-    const fileHash = await computeFileHash(filePath);
+    const buffer = req.file.buffer;
+    const fileName = decodeFilename(req.file.originalname);
+    const fileHash = computeBufferHash(buffer);
 
-    // 去重检查：相同 SHA256 的文件不重复入库
+    // SHA256 去重
     const existingEntry = await prisma.knowledgeEntry.findFirst({
       where: { kbId, sourceFileHash: fileHash },
     });
     if (existingEntry) {
-      await fs.unlink(filePath); // 删除重复的临时文件
       res.json({
         code: 0,
         data: {
@@ -198,20 +221,24 @@ router.post('/:id/entries/upload', upload.single('file'), async (req: AuthReques
       return;
     }
 
-    // 创建 entry 并发布异步任务
+    // 在内存中解析文档文本
+    const text = await parseDocumentBuffer(buffer, fileName);
+
+    // 创建 entry 并写入解析后的原文
     const entry = await prisma.knowledgeEntry.create({
       data: {
         kbId,
-        title: req.file.originalname,
-        content: '',
+        title: fileName,
+        content: text,
         type: 'FILE',
         processingStatus: 'PENDING',
-        sourceFileName: req.file.originalname,
+        sourceFileName: fileName,
         sourceFileHash: fileHash,
       },
     });
 
-    await publishDocumentProcessing(entry.id, filePath);
+    // 发布异步任务（仅传 entryId，Consumer 从 DB 读取文本）
+    await publishDocumentProcessing(entry.id);
 
     res.json({
       code: 0,

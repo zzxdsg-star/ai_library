@@ -61,8 +61,9 @@ model KnowledgeEntry {
   content          String           @db.Text
   type             EntryType        @default(MANUAL)
   status           EntryStatus      @default(ENABLED)
-  processingStatus ProcessingStatus @default(PENDING) @map("processing_status")
-  sourceFileName   String?          @map("source_file_name")
+  processingStatus  ProcessingStatus @default(PENDING) @map("processing_status")
+  processingMessage String?          @map("processing_message")
+  sourceFileName    String?          @map("source_file_name")
   sourceFileHash   String?          @map("source_file_hash")
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")

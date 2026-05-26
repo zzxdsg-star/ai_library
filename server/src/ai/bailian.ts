@@ -57,11 +57,23 @@ export async function getEmbedding(text: string): Promise<number[]> {
 }
 
 /**
- * 批量文本向量化。
- * LangChain embedDocuments 内部会并行调用 API。
+ * 批量文本向量化，分批调用以适配百炼 API 限制。
+ *
+ * 百炼 embedding 接口单次最多接受 25 条文本，
+ * 超过则报：batch size is invalid, it should not be larger than 25
+ * 此处按每批 20 条拆分（留余量），逐批调用后合并结果。
  */
 export async function getEmbeddings(texts: string[]): Promise<number[][]> {
-  return embeddings.embedDocuments(texts);
+  const BATCH_SIZE = 20;
+  const results: number[][] = [];
+
+  for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+    const batch = texts.slice(i, i + BATCH_SIZE);
+    const batchResults = await embeddings.embedDocuments(batch);
+    results.push(...batchResults);
+  }
+
+  return results;
 }
 
 /**

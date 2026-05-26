@@ -10,7 +10,6 @@ import {
   fetchMessages,
   deleteSession,
   addMessage,
-  setCurrentSession,
 } from '../store/chatSlice';
 import { chatApi } from '../api/chat.api';
 import { useSSE } from '../hooks/useSSE';
@@ -43,6 +42,7 @@ export default function ChatPage() {
 
   const handleCreateSession = async () => {
     await dispatch(createSession(id!));
+    dispatch(fetchSessions(id!));
   };
 
   const handleSelectSession = (sid: string) => {
@@ -79,8 +79,9 @@ export default function ChatPage() {
     const fullContent = await startStream(generator);
 
     if (fullContent) {
-      // 重新加载消息以获取服务器保存的引用和 token 用量
+      // 重新加载消息和会话列表（标题可能已更新）
       dispatch(fetchMessages({ kbId: id!, sid: sessionId }));
+      dispatch(fetchSessions(id!));
     }
   };
 

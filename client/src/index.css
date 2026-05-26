@@ -1,17 +1,224 @@
-/* 全局样式重置 */
+/* ===== 全局基础 ===== */
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* SSE 流式输出时的光标闪烁动画 */
+/* ===== 登录/注册背景渐变 ===== */
+.auth-bg {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #fafaf8 0%, #f0ebe0 40%, #e8dfd0 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 背景装饰几何图形 */
+.auth-bg::before {
+  content: '';
+  position: absolute;
+  top: -120px;
+  right: -80px;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(184, 134, 11, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.auth-bg::after {
+  content: '';
+  position: absolute;
+  bottom: -100px;
+  left: -60px;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(90, 120, 138, 0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ===== 知识库卡片动画 ===== */
+.kb-card-enter {
+  animation: cardFadeIn 0.4s ease both;
+}
+
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== 卡片悬停效果 ===== */
+.kb-card {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+}
+.kb-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  border-color: rgba(184, 134, 11, 0.2);
+}
+
+/* ===== SSE 流式光标闪烁 ===== */
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
 }
-
 .cursor-blink {
   animation: blink 1s infinite;
   font-weight: bold;
+  color: #b8860b;
 }
+
+/* ===== 消息气泡动画 ===== */
+@keyframes messageIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.msg-enter {
+  animation: messageIn 0.3s ease both;
+}
+
+/* ===== Ant Table 微调 ===== */
+.ant-table-wrapper .ant-table-thead > tr > th {
+  background: #fafaf8;
+  font-weight: 600;
+  color: #555;
+  border-bottom: 2px solid #eee;
+}
+
+/* ===== Modal 标题栏 ===== */
+.ant-modal-header {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 20px 24px 16px;
+}
+
+/* ===== 侧边栏品牌区 ===== */
+.sider-brand {
+  height: 48px;
+  margin: 18px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 20px;
+}
+
+/* ===== 顶部栏阴影 ===== */
+.header-bar {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  z-index: 10;
+  position: relative;
+}
+
+/* ===== 会话列表项 ===== */
+.session-item {
+  transition: all 0.15s ease;
+  border-radius: 6px;
+  margin: 2px 6px;
+}
+.session-item:hover {
+  background: #f5f3ef !important;
+}
+
+/* ===== 聊天输入区 ===== */
+.chat-input-area {
+  background: #fff;
+  border-top: 1px solid #f0ebe0;
+  padding: 14px 24px;
+}
+
+/* ===== 引用卡片微调 ===== */
+.ref-card {
+  border-left: 3px solid #b8860b;
+  transition: all 0.15s ease;
+}
+.ref-card:hover {
+  border-left-color: #d4a017;
+  background: #fdfbf7;
+}
+
+/* ===== 空状态 ===== */
+.ant-empty-description {
+  color: #aaa;
+}
+
+/* ===== AI 消息 Markdown 渲染 ===== */
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  margin-top: 12px;
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #333;
+}
+.markdown-body h1 { font-size: 1.3em; }
+.markdown-body h2 { font-size: 1.15em; border-bottom: 1px solid #e8e0d0; padding-bottom: 4px; }
+.markdown-body h3 { font-size: 1.05em; }
+.markdown-body p { margin: 4px 0; line-height: 1.7; }
+.markdown-body ul,
+.markdown-body ol { padding-left: 20px; margin: 6px 0; }
+.markdown-body li { margin: 2px 0; }
+.markdown-body code {
+  background: #f0ebe0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.markdown-body pre {
+  background: #1e1f24;
+  color: #e0d8c0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.markdown-body pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 8px 0;
+}
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid #e0d8c0;
+  padding: 6px 12px;
+  text-align: left;
+}
+.markdown-body th {
+  background: #fdf6e8;
+  font-weight: 600;
+}
+.markdown-body blockquote {
+  border-left: 3px solid #b8860b;
+  padding-left: 12px;
+  margin: 8px 0;
+  color: #666;
+}
+.markdown-body strong { font-weight: 600; }
+.markdown-body a { color: #b8860b; }

@@ -27,8 +27,10 @@ export default function EntryEditor({ open, kbId, onClose, onCreated }: Props) {
       message.success('创建成功');
       form.resetFields();
       onCreated();
-    } catch (err: any) {
-      message.error(err?.message || '创建失败');
+    } catch (err: unknown) {
+      message.error(
+        (err as { message?: string })?.message || '创建失败',
+      );
     }
   };
 

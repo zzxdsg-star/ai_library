@@ -1,5 +1,9 @@
 import { List, Button, Typography, Popconfirm } from 'antd';
-import { PlusOutlined, DeleteOutlined, MessageOutlined } from '@ant-design/icons';
+import {
+  PlusOutlined,
+  DeleteOutlined,
+  MessageOutlined,
+} from '@ant-design/icons';
 import type { ChatSession } from 'shared';
 
 interface Props {
@@ -11,7 +15,8 @@ interface Props {
 }
 
 /**
- * 左侧会话列表，支持新建、切换、删除会话。
+ * 左侧会话列表。
+ * 悬停时柔和背景变化，当前选中项金色左边框高亮。
  */
 export default function SessionList({
   sessions,
@@ -22,50 +27,86 @@ export default function SessionList({
 }: Props) {
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: 12, borderBottom: '1px solid #f0f0f0' }}>
-        <Button type="primary" icon={<PlusOutlined />} block onClick={onCreate}>
+      <div style={{ padding: '12px 14px' }}>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          block
+          onClick={onCreate}
+          style={{
+            borderRadius: 8,
+            height: 38,
+            fontWeight: 600,
+            background: 'linear-gradient(135deg, #b8860b, #c9940e)',
+            border: 'none',
+          }}
+        >
           新对话
         </Button>
       </div>
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '0 6px' }}>
         <List
           dataSource={sessions}
-          renderItem={(s) => (
-            <List.Item
-              style={{
-                padding: '8px 12px',
-                cursor: 'pointer',
-                background: s.id === currentId ? '#e6f4ff' : undefined,
-              }}
-              onClick={() => onSelect(s.id)}
-              actions={[
-                <Popconfirm
-                  key="del"
-                  title="删除该对话？"
-                  onConfirm={(e) => {
-                    e?.stopPropagation();
-                    onDelete(s.id);
-                  }}
-                >
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<DeleteOutlined />}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </Popconfirm>,
-              ]}
-            >
-              <List.Item.Meta
-                avatar={<MessageOutlined />}
-                title={
-                  <Typography.Text ellipsis style={{ width: 160 }}>
-                    {s.title}
-                  </Typography.Text>
-                }
-              />
-            </List.Item>
-          )}
+          renderItem={(s) => {
+            const active = s.id === currentId;
+            return (
+              <List.Item
+                className="session-item"
+                style={{
+                  padding: '10px 12px',
+                  cursor: 'pointer',
+                  borderLeft: active ? '3px solid #b8860b' : '3px solid transparent',
+                  background: active ? '#fdf6e8' : 'transparent',
+                  borderRadius: 6,
+                  marginBottom: 2,
+                }}
+                onClick={() => onSelect(s.id)}
+                actions={[
+                  <Popconfirm
+                    key="del"
+                    title="删除该对话？"
+                    okText="确认"
+                    cancelText="取消"
+                    onConfirm={(e) => {
+                      e?.stopPropagation();
+                      onDelete(s.id);
+                    }}
+                  >
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<DeleteOutlined style={{ fontSize: 13 }} />}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </Popconfirm>,
+                ]}
+              >
+                <List.Item.Meta
+                  avatar={
+                    <MessageOutlined
+                      style={{
+                        color: active ? '#b8860b' : '#999',
+                        fontSize: 16,
+                      }}
+                    />
+                  }
+                  title={
+                    <Typography.Text
+                      ellipsis
+                      style={{
+                        width: 150,
+                        fontSize: 13,
+                        fontWeight: active ? 600 : 400,
+                        color: active ? '#333' : '#666',
+                      }}
+                    >
+                      {s.title}
+                    </Typography.Text>
+                  }
+                />
+              </List.Item>
+            );
+          }}
         />
       </div>
     </div>

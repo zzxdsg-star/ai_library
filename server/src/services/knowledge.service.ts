@@ -190,6 +190,7 @@ export class KnowledgeService {
       type: entry.type,
       status: entry.status,
       processing_status: entry.processingStatus,
+      processing_message: entry.processingMessage,
       source_file_name: entry.sourceFileName,
       source_file_hash: entry.sourceFileHash,
       created_at: entry.createdAt.toISOString(),

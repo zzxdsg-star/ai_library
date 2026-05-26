@@ -1,7 +1,8 @@
 import { Avatar, Typography } from 'antd';
 import { UserOutlined, RobotOutlined } from '@ant-design/icons';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type { ChatMessage } from 'shared';
-import ReferenceCard from './ReferenceCard';
 
 interface Props {
   message: ChatMessage;
@@ -9,57 +10,77 @@ interface Props {
 }
 
 /**
- * 单条消息气泡：用户消息右对齐（蓝色），AI 消息左对齐（灰色）。
- * 支持流式打字效果（光标闪烁）和引用来源展示。
+ * 单条消息气泡。
+ * 用户消息：金色渐变背景、右对齐、纯文本。
+ * AI 消息：浅灰背景、左对齐、Markdown 渲染（支持表格/代码/列表等）。
  */
 export default function MessageBubble({ message, isStreaming }: Props) {
   const isUser = message.role === 'USER';
 
   return (
     <div
+      className="msg-enter"
       style={{
         display: 'flex',
         gap: 12,
-        marginBottom: 16,
+        marginBottom: 18,
         flexDirection: isUser ? 'row-reverse' : 'row',
       }}
     >
       <Avatar
         icon={isUser ? <UserOutlined /> : <RobotOutlined />}
+        size={36}
         style={{
-          background: isUser ? '#1677ff' : '#52c41a',
+          background: isUser
+            ? 'linear-gradient(135deg, #b8860b, #d4a017)'
+            : 'linear-gradient(135deg, #4a9e6e, #5bb87a)',
           flexShrink: 0,
+          boxShadow: isUser
+            ? '0 2px 8px rgba(184,134,11,0.3)'
+            : '0 2px 8px rgba(74,158,110,0.3)',
         }}
       />
-      <div style={{ maxWidth: '70%' }}>
+      <div style={{ maxWidth: '72%' }}>
         <div
           style={{
-            padding: '8px 16px',
-            borderRadius: 8,
-            background: isUser ? '#1677ff' : '#f5f5f5',
-            color: isUser ? '#fff' : '#000',
+            padding: '12px 18px',
+            borderRadius: isUser
+              ? '14px 14px 4px 14px'
+              : '14px 14px 14px 4px',
+            background: isUser
+              ? 'linear-gradient(135deg, #b8860b, #c9940e)'
+              : '#f5f3ef',
+            color: isUser ? '#fff' : '#333',
+            fontSize: 14,
+            ...(isUser
+              ? { boxShadow: '0 2px 6px rgba(184,134,11,0.15)' }
+              : { borderLeft: '3px solid #b8860b' }),
           }}
         >
-          <Typography.Paragraph
-            style={{ margin: 0, whiteSpace: 'pre-wrap' }}
-          >
-            {message.content}
-            {isStreaming && (
-              <span className="cursor-blink">|</span>
-            )}
-          </Typography.Paragraph>
+          {isUser ? (
+            <Typography.Paragraph
+              style={{ margin: 0, whiteSpace: 'pre-wrap' }}
+            >
+              {message.content}
+            </Typography.Paragraph>
+          ) : (
+            <div className="markdown-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {message.content}
+              </ReactMarkdown>
+              {isStreaming && <span className="cursor-blink">|</span>}
+            </div>
+          )}
         </div>
-        {message.references && message.references.length > 0 && (
-          <div style={{ marginTop: 8 }}>
-            {message.references.map((ref, i) => (
-              <ReferenceCard key={i} reference={ref} index={i + 1} />
-            ))}
-          </div>
-        )}
+
+        {/* Token 用量 */}
         {message.token_usage && (
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            Tokens: {message.token_usage.prompt_tokens} prompt +{' '}
-            {message.token_usage.completion_tokens} completion
+          <Typography.Text
+            type="secondary"
+            style={{ fontSize: 11, marginTop: 6, display: 'block' }}
+          >
+            {message.token_usage.prompt_tokens} prompt +{' '}
+            {message.token_usage.completion_tokens} completion tokens
           </Typography.Text>
         )}
       </div>

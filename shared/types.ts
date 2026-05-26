@@ -52,6 +52,7 @@ export interface KnowledgeEntry {
   type: EntryType;
   status: EntryStatus;
   processing_status: ProcessingStatus;
+  processing_message: string | null;
   source_file_name: string | null;
   source_file_hash: string | null;
   created_at: string;
