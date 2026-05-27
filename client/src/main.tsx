@@ -1,4 +1,3 @@
-import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
 import { ConfigProvider, App as AntdApp } from 'antd';
@@ -30,13 +29,13 @@ const theme = {
   },
   components: {
     Layout: {
-      siderBg: '#1e1f24',
-      triggerBg: '#2a2b30',
+      siderBg: '#2a231b',
+      triggerBg: '#3a3228',
     },
     Menu: {
-      darkItemBg: '#1e1f24',
+      darkItemBg: '#2a231b',
       darkItemSelectedBg: '#b8860b',
-      darkSubMenuItemBg: '#1e1f24',
+      darkSubMenuItemBg: '#2a231b',
     },
     Card: {
       borderRadiusLG: 12,
@@ -53,13 +52,11 @@ const theme = {
 };
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <Provider store={store}>
-      <ConfigProvider theme={theme} locale={zhCN}>
-        <AntdApp>
-          <App />
-        </AntdApp>
-      </ConfigProvider>
-    </Provider>
-  </React.StrictMode>,
+  <Provider store={store}>
+    <ConfigProvider theme={theme} locale={zhCN}>
+      <AntdApp>
+        <App />
+      </AntdApp>
+    </ConfigProvider>
+  </Provider>,
 );

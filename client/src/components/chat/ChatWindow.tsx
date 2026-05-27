@@ -133,7 +133,7 @@ export default function ChatWindow({
               justifyContent: 'center',
               background: streaming
                 ? undefined
-                : 'linear-gradient(135deg, #b8860b, #d4a017)',
+                : 'linear-gradient(135deg, #b8860b, #1d4ed8)',
               border: 'none',
             }}
           />

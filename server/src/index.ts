@@ -20,11 +20,13 @@ app.use(cookieParser());
 import authRoutes from './routes/auth.routes';
 import knowledgeRoutes from './routes/knowledge.routes';
 import chatRoutes from './routes/chat.routes';
+import analyticsRoutes from './routes/analytics.routes';
 import { startConsumer } from './queue/consumer';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/knowledge-bases', knowledgeRoutes);
 app.use('/api/knowledge-bases', chatRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 app.use(errorHandler);
 

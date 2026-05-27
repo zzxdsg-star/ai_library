@@ -31,6 +31,14 @@ export const createKB = createAsyncThunk(
   },
 );
 
+export const updateKB = createAsyncThunk(
+  'kb/update',
+  async (params: { id: string; data: Partial<CreateKnowledgeBaseRequest> }) => {
+    const res = await knowledgeApi.updateKB(params.id, params.data);
+    return res.data;
+  },
+);
+
 export const deleteKB = createAsyncThunk('kb/delete', async (id: string) => {
   await knowledgeApi.deleteKB(id);
   return id;
@@ -42,6 +50,9 @@ const knowledgeBaseSlice = createSlice({
   reducers: {
     setCurrentKB(state, action) {
       state.current = action.payload;
+    },
+    setPage(state, action) {
+      state.page = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -61,11 +72,16 @@ const knowledgeBaseSlice = createSlice({
       .addCase(createKB.fulfilled, (s, action) => {
         s.list.unshift(action.payload);
       })
+      .addCase(updateKB.fulfilled, (s, action) => {
+        const idx = s.list.findIndex((kb) => kb.id === action.payload.id);
+        if (idx >= 0) s.list[idx] = action.payload;
+        if (s.current?.id === action.payload.id) s.current = action.payload;
+      })
       .addCase(deleteKB.fulfilled, (s, action) => {
         s.list = s.list.filter((kb) => kb.id !== action.payload);
       });
   },
 });
 
-export const { setCurrentKB } = knowledgeBaseSlice.actions;
+export const { setCurrentKB, setPage } = knowledgeBaseSlice.actions;
 export default knowledgeBaseSlice.reducer;

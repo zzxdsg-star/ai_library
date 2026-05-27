@@ -18,6 +18,18 @@ export async function parseDocumentBuffer(
   if (ext === 'pdf') {
     const pdf = await import('pdf-parse');
     const data = await pdf.default(buffer);
+
+    if (!data.text || !data.text.trim()) {
+      // pdf-parse 提取不到文本的常见原因：
+      //   1. 扫版 PDF（页面上是图片，没有文字层）
+      //   2. PDF 字体编码不标准，pdf-parse 无法识别
+      const reason =
+        data.numpages > 0
+          ? `PDF 解析后无文本（共 ${data.numpages} 页），可能是扫版 PDF 或加密文档`
+          : 'PDF 无法识别，文件可能已损坏或格式不标准';
+      throw new Error(reason);
+    }
+
     return data.text;
   }
 

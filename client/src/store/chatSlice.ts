@@ -69,6 +69,11 @@ const chatSlice = createSlice({
     stopStreaming(state) {
       state.streaming = false;
     },
+    resetChat(state) {
+      state.sessions = [];
+      state.currentSessionId = null;
+      state.messages = [];
+    },
     addMessage(state, action) {
       state.messages.push(action.payload);
     },
@@ -103,5 +108,6 @@ export const {
   startStreaming,
   stopStreaming,
   addMessage,
+  resetChat,
 } = chatSlice.actions;
 export default chatSlice.reducer;

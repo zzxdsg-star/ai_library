@@ -1,12 +1,18 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { AppError } from '../errors/app-error';
 import { ErrorCodes } from '../errors/error-codes';
+import { cacheGet, cacheSet, cacheDel, cacheDelPattern } from '../cache/redis';
 
 const prisma = new PrismaClient();
 
 /**
  * 知识管理服务：知识库 CRUD + 知识条目 CRUD。
  * 所有操作校验资源归属（userId），确保用户只能操作自己的知识库。
+ *
+ * Redis 缓存策略：
+ * - 知识库列表/详情：缓存 5 分钟，写操作后失效
+ * - 条目列表/详情：缓存 2 分钟，写操作后失效
+ * - 缓存 key 格式：kb:{userId}, entry:{kbId}
  */
 export class KnowledgeService {
   // ==================== Knowledge Bases ====================
@@ -15,10 +21,15 @@ export class KnowledgeService {
     const kb = await prisma.knowledgeBase.create({
       data: { name, description, systemPrompt, userId },
     });
+    await cacheDelPattern(`kb:${userId}:*`);
     return this.formatKB(kb);
   }
 
   async listKB(userId: string, page = 1, size = 10) {
+    const cacheKey = `kb:${userId}:${page}:${size}`;
+    const cached = await cacheGet<any>(cacheKey);
+    if (cached) return cached;
+
     const where = { userId };
     const [total, records] = await Promise.all([
       prisma.knowledgeBase.count({ where }),
@@ -29,36 +40,42 @@ export class KnowledgeService {
         take: size,
       }),
     ]);
-    return {
-      total,
-      records: records.map(this.formatKB),
-      current: page,
-      size,
-    };
+    const result = { total, records: records.map(this.formatKB), current: page, size };
+    // 空列表不缓存，避免删光数据后残留空缓存
+    if (total > 0) {
+      await cacheSet(cacheKey, result, 300);
+    }
+    return result;
   }
 
   async getKB(kbId: string, userId: string) {
+    const cacheKey = `kb:detail:${kbId}`;
+    const cached = await cacheGet<any>(cacheKey);
+    if (cached) return cached;
+
     const kb = await prisma.knowledgeBase.findFirst({
       where: { id: kbId, userId },
     });
     if (!kb) {
       throw new AppError(ErrorCodes.KB_NOT_FOUND, '知识库不存在', 404);
     }
-    return this.formatKB(kb);
+    const result = this.formatKB(kb);
+    await cacheSet(cacheKey, result, 300);
+    return result;
   }
 
   async updateKB(kbId: string, userId: string, data: { name?: string; description?: string; systemPrompt?: string }) {
-    await this.getKB(kbId, userId); // 校验存在 + 归属
-    const kb = await prisma.knowledgeBase.update({
-      where: { id: kbId },
-      data,
-    });
+    await this.getKB(kbId, userId);
+    const kb = await prisma.knowledgeBase.update({ where: { id: kbId }, data });
+    // 失效相关缓存
+    await Promise.all([cacheDelPattern(`kb:${userId}:*`), cacheDel(`kb:detail:${kbId}`)]);
     return this.formatKB(kb);
   }
 
   async deleteKB(kbId: string, userId: string) {
     await this.getKB(kbId, userId);
     await prisma.knowledgeBase.delete({ where: { id: kbId } });
+    await Promise.all([cacheDelPattern(`kb:${userId}:*`), cacheDel(`kb:detail:${kbId}`), cacheDelPattern(`entry:${kbId}:*`), cacheDelPattern('analytics:*')]);
   }
 
   // ==================== Knowledge Entries ====================
@@ -68,18 +85,23 @@ export class KnowledgeService {
     const entry = await prisma.knowledgeEntry.create({
       data: { kbId, title, content, type: 'MANUAL', processingStatus: 'PENDING' },
     });
+    await cacheDelPattern(`entry:${kbId}:*`);
     return this.formatEntry(entry);
   }
 
   async listEntries(
-    kbId: string,
-    userId: string,
-    page = 1,
-    size = 10,
-    search?: string,
-    status?: string,
+    kbId: string, userId: string, page = 1, size = 10,
+    search?: string, status?: string,
   ) {
     await this.getKB(kbId, userId);
+
+    // 有搜索条件时不缓存（查询变化多，缓存命中率低）
+    if (!search && !status) {
+      const cacheKey = `entry:${kbId}:${page}:${size}`;
+      const cached = await cacheGet<any>(cacheKey);
+      if (cached) return cached;
+    }
+
     const where: Prisma.KnowledgeEntryWhereInput = { kbId };
     if (search) {
       where.OR = [
@@ -94,28 +116,32 @@ export class KnowledgeService {
     const [total, records] = await Promise.all([
       prisma.knowledgeEntry.count({ where }),
       prisma.knowledgeEntry.findMany({
-        where,
-        orderBy: { updatedAt: 'desc' },
-        skip: (page - 1) * size,
-        take: size,
+        where, orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * size, take: size,
       }),
     ]);
-    return {
-      total,
-      records: records.map(this.formatEntry),
-      current: page,
-      size,
-    };
+    const result = { total, records: records.map(this.formatEntry), current: page, size };
+
+    if (!search && !status && total > 0) {
+      await cacheSet(`entry:${kbId}:${page}:${size}`, result, 120);
+    }
+    return result;
   }
 
   async getEntry(entryId: string, userId: string) {
+    const cacheKey = `entry:detail:${entryId}`;
+    const cached = await cacheGet<any>(cacheKey);
+    if (cached) return cached;
+
     const entry = await prisma.knowledgeEntry.findFirst({
       where: { id: entryId, kb: { userId } },
     });
     if (!entry) {
       throw new AppError(ErrorCodes.ENTRY_NOT_FOUND, '知识条目不存在', 404);
     }
-    return this.formatEntry(entry);
+    const result = this.formatEntry(entry);
+    await cacheSet(cacheKey, result, 120);
+    return result;
   }
 
   async updateEntry(entryId: string, userId: string, data: { title?: string; content?: string }) {
@@ -125,10 +151,8 @@ export class KnowledgeService {
     if (!entry) {
       throw new AppError(ErrorCodes.ENTRY_NOT_FOUND, '知识条目不存在', 404);
     }
-    const updated = await prisma.knowledgeEntry.update({
-      where: { id: entryId },
-      data,
-    });
+    const updated = await prisma.knowledgeEntry.update({ where: { id: entryId }, data });
+    await Promise.all([cacheDelPattern(`entry:${entry.kbId}:*`), cacheDel(`entry:detail:${entryId}`)]);
     return this.formatEntry(updated);
   }
 
@@ -140,6 +164,7 @@ export class KnowledgeService {
       throw new AppError(ErrorCodes.ENTRY_NOT_FOUND, '知识条目不存在', 404);
     }
     await prisma.knowledgeEntry.delete({ where: { id: entryId } });
+    await Promise.all([cacheDelPattern(`entry:${entry.kbId}:*`), cacheDel(`entry:detail:${entryId}`)]);
   }
 
   async updateEntryStatus(entryId: string, userId: string, status: 'ENABLED' | 'DISABLED') {
@@ -150,15 +175,12 @@ export class KnowledgeService {
       throw new AppError(ErrorCodes.ENTRY_NOT_FOUND, '知识条目不存在', 404);
     }
     const updated = await prisma.knowledgeEntry.update({
-      where: { id: entryId },
-      data: { status },
+      where: { id: entryId }, data: { status },
     });
+    await Promise.all([cacheDelPattern(`entry:${entry.kbId}:*`), cacheDel(`entry:detail:${entryId}`)]);
     return this.formatEntry(updated);
   }
 
-  /**
-   * 获取条目所有已启用的分块（用于检索）。
-   */
   async getEntryChunks(entryId: string, userId: string) {
     await this.getEntry(entryId, userId);
     return prisma.knowledgeChunk.findMany({
@@ -171,24 +193,16 @@ export class KnowledgeService {
 
   private formatKB(kb: any) {
     return {
-      id: kb.id,
-      name: kb.name,
-      description: kb.description,
-      system_prompt: kb.systemPrompt,
-      user_id: kb.userId,
-      created_at: kb.createdAt.toISOString(),
-      updated_at: kb.updatedAt.toISOString(),
+      id: kb.id, name: kb.name, description: kb.description,
+      system_prompt: kb.systemPrompt, user_id: kb.userId,
+      created_at: kb.createdAt.toISOString(), updated_at: kb.updatedAt.toISOString(),
     };
   }
 
   private formatEntry(entry: any) {
     return {
-      id: entry.id,
-      kb_id: entry.kbId,
-      title: entry.title,
-      content: entry.content,
-      type: entry.type,
-      status: entry.status,
+      id: entry.id, kb_id: entry.kbId, title: entry.title,
+      content: entry.content, type: entry.type, status: entry.status,
       processing_status: entry.processingStatus,
       processing_message: entry.processingMessage,
       source_file_name: entry.sourceFileName,

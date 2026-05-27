@@ -58,4 +58,26 @@ export async function cacheDel(key: string): Promise<void> {
   }
 }
 
+/**
+ * 按模式批量删除缓存（如 kb:abc123:* 匹配该用户所有知识库缓存页）。
+ * 使用 SCAN 遍历匹配的 key 再批量 DEL，避免 KEYS 阻塞线上 Redis。
+ */
+export async function cacheDelPattern(pattern: string): Promise<void> {
+  try {
+    let cursor = '0';
+    const keysToDelete: string[] = [];
+    do {
+      const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      cursor = nextCursor;
+      keysToDelete.push(...keys);
+    } while (cursor !== '0');
+
+    if (keysToDelete.length > 0) {
+      await redis.del(...keysToDelete);
+    }
+  } catch (err) {
+    console.warn('[Redis] Cache pattern delete failed:', (err as Error).message);
+  }
+}
+
 export { redis };

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Modal, Upload, App } from 'antd';
-import { InboxOutlined } from '@ant-design/icons';
+import { CloudUploadOutlined } from '@ant-design/icons';
 import { knowledgeApi } from '../../api/knowledge.api';
 
 const { Dragger } = Upload;
@@ -12,17 +12,11 @@ interface Props {
   onUploaded: () => void;
 }
 
-/**
- * 文档上传 Modal，支持拖拽上传。
- * 使用 key 强制重置 Dragger 内部文件列表，避免二次打开时残留上次文件。
- */
 export default function FileUpload({ open, kbId, onClose, onUploaded }: Props) {
   const { message } = App.useApp();
   const [uploadKey, setUploadKey] = useState(0);
 
-  const handleOpen = () => {
-    setUploadKey((k) => k + 1);
-  };
+  const handleOpen = () => setUploadKey((k) => k + 1);
 
   const handleUpload = async (file: File) => {
     try {
@@ -40,11 +34,12 @@ export default function FileUpload({ open, kbId, onClose, onUploaded }: Props) {
 
   return (
     <Modal
-      title="上传文档"
+      title={<span style={{ fontSize: 17, fontWeight: 600 }}>上传文档</span>}
       open={open}
       onCancel={onClose}
       afterOpenChange={handleOpen}
       footer={null}
+      width={500}
     >
       <Dragger
         key={uploadKey}
@@ -54,13 +49,16 @@ export default function FileUpload({ open, kbId, onClose, onUploaded }: Props) {
           handleUpload(file);
           return false;
         }}
+        style={{ borderRadius: 16 }}
       >
         <p className="ant-upload-drag-icon">
-          <InboxOutlined />
+          <CloudUploadOutlined style={{ color: '#b8860b' }} />
         </p>
-        <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-        <p className="ant-upload-hint">
-          支持 PDF、Word、Markdown、TXT 格式
+        <p className="ant-upload-text" style={{ fontWeight: 600, fontSize: 15 }}>
+          点击或拖拽文件到此区域
+        </p>
+        <p className="ant-upload-hint" style={{ color: '#999' }}>
+          支持 PDF、Word、Markdown、TXT，最大 20MB
         </p>
       </Dragger>
     </Modal>

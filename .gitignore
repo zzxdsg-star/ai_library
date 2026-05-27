@@ -39,3 +39,6 @@ client/node_modules/.vite/
 
 # Design docs (internal only)
 docs/
+
+# Screenshots and debug files
+error/

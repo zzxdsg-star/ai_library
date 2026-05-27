@@ -10,6 +10,7 @@ import {
   computeBufferHash,
 } from '../ingestion/parser';
 import { publishDocumentProcessing } from '../queue/producer';
+import { cacheDelPattern } from '../cache/redis';
 
 const prisma = new PrismaClient();
 
@@ -80,7 +81,10 @@ router.get('/:id', async (req: AuthRequest, res: Response, next: NextFunction) =
 
 router.put('/:id', async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const kb = await knowledgeService.updateKB(req.params.id as string, req.user!.id, req.body);
+    // API 层 snake_case → Prisma camelCase 映射
+    const { system_prompt, ...rest } = req.body;
+    const data = { ...rest, ...(system_prompt !== undefined ? { systemPrompt: system_prompt } : {}) };
+    const kb = await knowledgeService.updateKB(req.params.id as string, req.user!.id, data);
     res.json({ code: 0, data: kb, message: 'ok' });
   } catch (e) {
     next(e);
@@ -108,7 +112,7 @@ router.post('/:id/entries', async (req: AuthRequest, res: Response, next: NextFu
       content,
     );
     // 手动录入的条目也走异步 embedding 管线
-    await publishDocumentProcessing(entry.id);
+    await publishDocumentProcessing(entry.id, content);
     res.json({ code: 0, data: entry, message: 'ok' });
   } catch (e) {
     next(e);
@@ -237,8 +241,11 @@ router.post('/:id/entries/upload', upload.single('file'), async (req: AuthReques
       },
     });
 
-    // 发布异步任务（仅传 entryId，Consumer 从 DB 读取文本）
-    await publishDocumentProcessing(entry.id);
+    // 失效条目列表缓存
+    await cacheDelPattern(`entry:${kbId}:*`);
+
+    // 发布异步任务（text 随消息传递，避免 Consumer 从 DB 读取时写延迟）
+    await publishDocumentProcessing(entry.id, text);
 
     res.json({
       code: 0,

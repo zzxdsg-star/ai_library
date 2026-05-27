@@ -9,11 +9,6 @@ interface Props {
   isStreaming?: boolean;
 }
 
-/**
- * 单条消息气泡。
- * 用户消息：金色渐变背景、右对齐、纯文本。
- * AI 消息：浅灰背景、左对齐、Markdown 渲染（支持表格/代码/列表等）。
- */
 export default function MessageBubble({ message, isStreaming }: Props) {
   const isUser = message.role === 'USER';
 
@@ -44,23 +39,20 @@ export default function MessageBubble({ message, isStreaming }: Props) {
         <div
           style={{
             padding: '12px 18px',
-            borderRadius: isUser
-              ? '14px 14px 4px 14px'
-              : '14px 14px 14px 4px',
+            borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
             background: isUser
               ? 'linear-gradient(135deg, #b8860b, #c9940e)'
               : '#f5f3ef',
             color: isUser ? '#fff' : '#333',
             fontSize: 14,
+            lineHeight: 1.7,
             ...(isUser
               ? { boxShadow: '0 2px 6px rgba(184,134,11,0.15)' }
               : { borderLeft: '3px solid #b8860b' }),
           }}
         >
           {isUser ? (
-            <Typography.Paragraph
-              style={{ margin: 0, whiteSpace: 'pre-wrap' }}
-            >
+            <Typography.Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
               {message.content}
             </Typography.Paragraph>
           ) : (
@@ -72,15 +64,9 @@ export default function MessageBubble({ message, isStreaming }: Props) {
             </div>
           )}
         </div>
-
-        {/* Token 用量 */}
         {message.token_usage && (
-          <Typography.Text
-            type="secondary"
-            style={{ fontSize: 11, marginTop: 6, display: 'block' }}
-          >
-            {message.token_usage.prompt_tokens} prompt +{' '}
-            {message.token_usage.completion_tokens} completion tokens
+          <Typography.Text type="secondary" style={{ fontSize: 11, marginTop: 6, display: 'block' }}>
+            {message.token_usage.prompt_tokens} prompt + {message.token_usage.completion_tokens} completion tokens
           </Typography.Text>
         )}
       </div>

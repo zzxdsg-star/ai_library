@@ -18,16 +18,19 @@ async function getChannel(): Promise<Channel> {
 
 /**
  * 发布文档处理任务到 RabbitMQ。
- * 仅传 entryId，文本内容已由路由层解析并写入 DB。
- * Consumer 收到后直接从 DB 读取文本进行分块+Embedding。
+ * 文本已经在路由层解析完成，直接随消息传递，
+ * 避免 Consumer 去 DB 读取时可能遇到的写延迟问题。
  */
 export async function publishDocumentProcessing(
   entryId: string,
+  text: string,
 ): Promise<void> {
   const ch = await getChannel();
-  ch.sendToQueue(QUEUE_NAME, Buffer.from(JSON.stringify({ entryId })), {
-    persistent: true,
-  });
+  ch.sendToQueue(
+    QUEUE_NAME,
+    Buffer.from(JSON.stringify({ entryId, text })),
+    { persistent: true },
+  );
   console.log(`[RabbitMQ] Published job for entry: ${entryId}`);
 }
 

@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button } from 'antd';
+import { Button, Typography } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import type { AppDispatch, RootState } from '../store';
 import {
@@ -10,6 +10,7 @@ import {
   fetchMessages,
   deleteSession,
   addMessage,
+  resetChat,
 } from '../store/chatSlice';
 import { chatApi } from '../api/chat.api';
 import { useSSE } from '../hooks/useSSE';
@@ -17,10 +18,6 @@ import SessionList from '../components/chat/SessionList';
 import ChatWindow from '../components/chat/ChatWindow';
 import type { ChatMessage } from 'shared';
 
-/**
- * 对话问答页：左侧会话列表 + 右侧聊天窗口。
- * 支持 SSE 流式输出、多轮对话、引用来源展示。
- */
 export default function ChatPage() {
   const { id, sid } = useParams<{ id: string; sid?: string }>();
   const dispatch = useDispatch<AppDispatch>();
@@ -31,6 +28,7 @@ export default function ChatPage() {
   const { streaming, streamContent, startStream } = useSSE();
 
   useEffect(() => {
+    dispatch(resetChat());
     if (id) dispatch(fetchSessions(id));
   }, [id, dispatch]);
 
@@ -62,7 +60,6 @@ export default function ChatPage() {
       navigate(`/knowledge-bases/${id}/chat/${sessionId}`);
     }
 
-    // 立即显示用户消息
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       session_id: sessionId,
@@ -74,54 +71,73 @@ export default function ChatPage() {
     };
     dispatch(addMessage(userMsg));
 
-    // SSE 流式获取 AI 回答
     const generator = chatApi.sendMessage(id!, sessionId, content);
     const fullContent = await startStream(generator);
 
     if (fullContent) {
-      // 重新加载消息和会话列表（标题可能已更新）
       dispatch(fetchMessages({ kbId: id!, sid: sessionId }));
       dispatch(fetchSessions(id!));
     }
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        height: 'calc(100vh - 112px)',
-        gap: 0,
-      }}
-    >
+    <div style={{ display: 'flex', height: 'calc(100vh - 116px)', gap: 0, margin: -28 }}>
+      {/* Left sidebar */}
       <div
         style={{
           width: 280,
-          borderRight: '1px solid #f0f0f0',
+          background: '#fff',
+          borderRight: '1px solid rgba(0,0,0,0.05)',
+          borderLeft: '1px solid rgba(0,0,0,0.05)',
+          boxShadow: '2px 0 12px rgba(0,0,0,0.03)',
+          display: 'flex',
+          flexDirection: 'column',
           flexShrink: 0,
+          borderTopLeftRadius: 16,
+          borderBottomLeftRadius: 16,
+          overflow: 'hidden',
         }}
       >
         <div
           style={{
-            padding: 12,
-            borderBottom: '1px solid #f0f0f0',
+            padding: '16px 16px 12px',
+            borderBottom: '1px solid rgba(0,0,0,0.05)',
           }}
         >
           <Button
+            type="text"
             icon={<ArrowLeftOutlined />}
             onClick={() => navigate(`/knowledge-bases/${id}`)}
+            style={{ marginBottom: 8, color: '#666' }}
           >
             返回
           </Button>
+          <Typography.Title level={5} style={{ margin: 0 }}>
+            对话列表
+          </Typography.Title>
         </div>
-        <SessionList
-          sessions={sessions}
-          currentId={currentSessionId}
-          onSelect={handleSelectSession}
-          onCreate={handleCreateSession}
-          onDelete={handleDeleteSession}
-        />
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <SessionList
+            sessions={sessions}
+            currentId={currentSessionId}
+            onSelect={handleSelectSession}
+            onCreate={handleCreateSession}
+            onDelete={handleDeleteSession}
+          />
+        </div>
       </div>
-      <div style={{ flex: 1 }}>
+
+      {/* Right chat area */}
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          background: 'linear-gradient(180deg, #fdfcfa 0%, #faf9f6 100%)',
+          borderTopRightRadius: 16,
+          borderBottomRightRadius: 16,
+        }}
+      >
         <ChatWindow
           messages={messages}
           streaming={streaming}

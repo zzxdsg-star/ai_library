@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { embedText } from './embedder';
+import { cacheDelPattern } from '../cache/redis';
 
 const prisma = new PrismaClient();
 
@@ -146,6 +147,8 @@ export async function hybridSearch(
       SET hit_count = hit_count + 1
       WHERE id IN (${ids})
     `);
+    // 每次检索命中都清统计缓存，下次请求拿到最新热度数据
+    await cacheDelPattern('analytics:*').catch(() => {});
   }
 
   return results;

@@ -42,6 +42,14 @@ export const createEntry = createAsyncThunk(
   },
 );
 
+export const updateEntry = createAsyncThunk(
+  'entries/update',
+  async (params: { kbId: string; eid: string; data: Partial<CreateEntryRequest> }) => {
+    const res = await knowledgeApi.updateEntry(params.kbId, params.eid, params.data);
+    return res.data;
+  },
+);
+
 export const deleteEntry = createAsyncThunk(
   'entries/delete',
   async (params: { kbId: string; eid: string }) => {
@@ -99,6 +107,10 @@ const knowledgeEntrySlice = createSlice({
       .addCase(createEntry.fulfilled, (s, action) => {
         s.list.unshift(action.payload);
         s.total += 1;
+      })
+      .addCase(updateEntry.fulfilled, (s, action) => {
+        const idx = s.list.findIndex((e) => e.id === action.payload.id);
+        if (idx >= 0) s.list[idx] = action.payload;
       })
       .addCase(deleteEntry.fulfilled, (s, action) => {
         s.list = s.list.filter((e) => e.id !== action.payload);
