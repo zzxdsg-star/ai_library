@@ -2,9 +2,11 @@ import { useEffect, useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Table, Button, Input, Select, Space, Tag, Typography, Tooltip, App, Tabs, Spin, Empty,
+  Table, Button, Input, Select, Space, Tag, Typography, Tooltip, App, Tabs, Spin, Empty, Modal,
 } from 'antd';
-import { PlusOutlined, UploadOutlined, MessageOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { PlusOutlined, UploadOutlined, MessageOutlined, ArrowLeftOutlined, EyeOutlined } from '@ant-design/icons';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import ReactECharts from 'echarts-for-react';
 import type { AppDispatch, RootState } from '../store';
 import {
@@ -26,6 +28,7 @@ export default function KnowledgeEntryList() {
   const [editingEntry, setEditingEntry] = useState<KnowledgeEntry | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('list');
+  const [previewEntry, setPreviewEntry] = useState<KnowledgeEntry | null>(null);
 
   useEffect(() => { if (id) dispatch(fetchEntries({ kbId: id, page, search, status: statusFilter })); },
     [id, page, search, statusFilter, dispatch]);
@@ -65,7 +68,13 @@ export default function KnowledgeEntryList() {
 
   const columns = [
     { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true, render: (t: string) => <span style={{ fontWeight: 500 }}>{t}</span> },
-    { title: '类型', dataIndex: 'type', key: 'type', width: 80, render: (t: string) => <Tag color={t === 'MANUAL' ? 'blue' : 'purple'}>{t === 'MANUAL' ? '手动' : '文件'}</Tag> },
+    { title: '类型', dataIndex: 'type', key: 'type', width: 80,
+      render: (t: string, record: KnowledgeEntry) => {
+        const isImage = /\.(png|jpg|jpeg)$/i.test(record.source_file_name || '');
+        if (isImage) return <Tag color="orange">图片</Tag>;
+        return <Tag color={t === 'MANUAL' ? 'blue' : 'purple'}>{t === 'MANUAL' ? '手动' : '文件'}</Tag>;
+      },
+    },
     { title: '状态', dataIndex: 'status', key: 'status', width: 90,
       render: (s: string, record: KnowledgeEntry) => (
         <Tag color={s === 'ENABLED' ? 'success' : 'error'} style={{ cursor: 'pointer' }} onClick={() => handleToggleStatus(record)}>
@@ -88,9 +97,10 @@ export default function KnowledgeEntryList() {
     },
     { title: '更新时间', dataIndex: 'updated_at', key: 'updated_at', width: 170,
       render: (d: string) => new Date(d).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) },
-    { title: '操作', key: 'actions', width: 160, align: 'center' as const,
+    { title: '操作', key: 'actions', width: 220, align: 'center' as const,
       render: (_: unknown, record: KnowledgeEntry) => (
         <Space>
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setPreviewEntry(record)}>预览</Button>
           <Button type="link" size="small" onClick={() => { setEditingEntry(record); setEditorOpen(true); }}>编辑</Button>
           <Button type="link" size="small" danger onClick={() => handleDelete(record.id, record.title)}>删除</Button>
         </Space>),
@@ -141,7 +151,54 @@ export default function KnowledgeEntryList() {
         onSaved={() => { setEditorOpen(false); setEditingEntry(null); dispatch(fetchEntries({ kbId: id!, page: 1, search, status: statusFilter })); }} />
       <FileUpload open={uploadOpen} kbId={id!} onClose={() => setUploadOpen(false)}
         onUploaded={() => { setUploadOpen(false); dispatch(fetchEntries({ kbId: id!, page: 1, search, status: statusFilter })); }} />
+
+      <EntryPreview entry={previewEntry} onClose={() => setPreviewEntry(null)} />
     </div>
+  );
+}
+
+/** 从内容中提取 OSS 图片 URL */
+function extractImageUrl(content: string): string | null {
+  const match = content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+  return match ? match[1] : null;
+}
+
+function isImageEntry(entry: KnowledgeEntry): boolean {
+  return /\.(png|jpg|jpeg)$/i.test(entry.source_file_name || '');
+}
+
+/** 条目预览弹窗：图片直接展示，Markdown/文本渲染展示 */
+function EntryPreview({ entry, onClose }: { entry: KnowledgeEntry | null; onClose: () => void }) {
+  if (!entry) return null;
+
+  const imageEntry = isImageEntry(entry);
+  const imageUrl = imageEntry ? extractImageUrl(entry.content) : null;
+
+  return (
+    <Modal
+      title={entry.title}
+      open={!!entry}
+      onCancel={onClose}
+      footer={null}
+      width={imageEntry ? 680 : 800}
+    >
+      {imageEntry && imageUrl ? (
+        <div style={{ textAlign: 'center' }}>
+          <img src={imageUrl} alt={entry.title} style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 12 }} />
+          {entry.content && (
+            <div style={{ marginTop: 16, color: '#666', fontSize: 13, lineHeight: 1.8, textAlign: 'left' }}>
+              {entry.content.replace(/!\[.*?\]\([^)]+\)/, '').trim()}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="markdown-body" style={{ maxHeight: '70vh', overflow: 'auto', padding: '8px 4px' }}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {entry.content}
+          </ReactMarkdown>
+        </div>
+      )}
+    </Modal>
   );
 }
 
