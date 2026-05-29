@@ -2,6 +2,7 @@ import { PrismaClient, Prisma } from '@prisma/client';
 import { AppError } from '../errors/app-error';
 import { ErrorCodes } from '../errors/error-codes';
 import { cacheGet, cacheSet, cacheDel, cacheDelPattern } from '../cache/redis';
+import { deleteImage } from '../storage/oss';
 
 const prisma = new PrismaClient();
 
@@ -74,7 +75,14 @@ export class KnowledgeService {
 
   async deleteKB(kbId: string, userId: string) {
     await this.getKB(kbId, userId);
+    // 删除前取出所有条目 ID，用于清理 OSS 图片
+    const entries = await prisma.knowledgeEntry.findMany({
+      where: { kbId },
+      select: { id: true },
+    });
     await prisma.knowledgeBase.delete({ where: { id: kbId } });
+    // 异步清理 OSS 图片
+    entries.forEach((e) => deleteImage(userId, e.id).catch((err) => console.error('OSS 删除失败:', err)));
     await Promise.all([cacheDelPattern(`kb:${userId}:*`), cacheDel(`kb:detail:${kbId}`), cacheDelPattern(`entry:${kbId}:*`), cacheDelPattern('analytics:*')]);
   }
 
@@ -164,6 +172,8 @@ export class KnowledgeService {
       throw new AppError(ErrorCodes.ENTRY_NOT_FOUND, '知识条目不存在', 404);
     }
     await prisma.knowledgeEntry.delete({ where: { id: entryId } });
+    // 异步清理 OSS 图片（不阻塞响应）
+    deleteImage(userId, entryId).catch((err) => console.error('OSS 删除失败:', err));
     await Promise.all([cacheDelPattern(`entry:${entry.kbId}:*`), cacheDel(`entry:detail:${entryId}`)]);
   }
 

@@ -13,5 +13,12 @@ export const config = {
     apiKey: process.env.BAILIAN_API_KEY || '',
     embeddingModel: 'text-embedding-v2',
     llmModel: 'qwen-plus',
+    visionModel: 'qwen-vl-plus',
+  },
+  oss: {
+    accessKeyId: process.env.OSS_ACCESS_KEY_ID || '',
+    accessKeySecret: process.env.OSS_ACCESS_KEY_SECRET || '',
+    bucket: process.env.OSS_BUCKET || 'my-ai-library',
+    region: process.env.OSS_REGION || 'oss-cn-hangzhou',
   },
 };

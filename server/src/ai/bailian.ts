@@ -77,6 +77,46 @@ export async function getEmbeddings(texts: string[]): Promise<number[][]> {
 }
 
 /**
+ * 视觉模型看图生成文字描述。
+ *
+ * qwen-vl-plus 接收图片并输出中文描述（100-200 字）。
+ * 使用 LangChain ChatOpenAI 的多模态 content 格式
+ * （数组，包含 text 和 image_url 两种 block）。
+ */
+export async function describeImage(base64Image: string, mimeType: string): Promise<string> {
+  const visionModel = new ChatOpenAI({
+    model: config.bailian.visionModel,
+    apiKey: config.bailian.apiKey,
+    configuration: { baseURL: BASE_URL },
+    temperature: 0.3,
+    maxTokens: 512,
+  });
+
+  const response = await visionModel.invoke([
+    {
+      role: 'user',
+      content: [
+        {
+          type: 'text',
+          text: '请用中文详细描述这张图片的内容，包括关键信息、主体、场景和重要细节，约100-200字。只输出描述文字，不要加"这张图片"开头。',
+        },
+        {
+          type: 'image_url',
+          image_url: { url: `data:${mimeType};base64,${base64Image}` },
+        },
+      ],
+    },
+  ]);
+
+  const content = typeof response.content === 'string'
+    ? response.content
+    : Array.isArray(response.content)
+      ? response.content.map((c: any) => c.text || '').join('')
+      : '';
+  return content.trim();
+}
+
+/**
  * 流式 LLM 对话生成（AsyncGenerator）。
  *
  * 通过 LangChain ChatOpenAI.stream() 获取 token 级别的流式输出，

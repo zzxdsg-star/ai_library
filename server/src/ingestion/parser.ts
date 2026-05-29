@@ -43,6 +43,14 @@ export async function parseDocumentBuffer(
     return decodeChineseText(buffer);
   }
 
+  if (ext === 'csv') {
+    return parseCSV(buffer);
+  }
+
+  if (ext === 'xlsx') {
+    return parseExcel(buffer);
+  }
+
   throw new Error(`Unsupported file type: .${ext}`);
 }
 
@@ -55,6 +63,80 @@ function decodeChineseText(buffer: Buffer): string {
     return utf8Text;
   }
   return iconv.decode(buffer, 'gbk');
+}
+
+/**
+ * CSV 解析：将 CSV 内容转为 Markdown table。
+ * 第一行作为表头。
+ */
+function parseCSV(buffer: Buffer): string {
+  const text = decodeChineseText(buffer);
+  const rows: string[][] = [];
+  text.split('\n').forEach((line) => {
+    const cells = parseCSVLine(line);
+    if (cells.some((c) => c.trim())) {
+      rows.push(cells);
+    }
+  });
+  if (rows.length === 0) throw new Error('CSV 文件为空');
+  return rowsToMarkdownTable(rows);
+}
+
+/**
+ * 简单 CSV 行解析：处理引号内的逗号。
+ */
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuote = false;
+  for (const ch of line) {
+    if (ch === '"') {
+      inQuote = !inQuote;
+    } else if (ch === ',' && !inQuote) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+/**
+ * Excel (.xlsx) 解析：读取第一个 sheet，转为 Markdown table。
+ */
+function parseExcel(buffer: Buffer): string {
+  const XLSX = require('xlsx');
+  const wb = XLSX.read(buffer, { type: 'buffer' });
+  const sheetName = wb.SheetNames[0];
+  if (!sheetName) throw new Error('Excel 文件为空');
+  const sheet = wb.Sheets[sheetName];
+  const rows: any[][] = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    defval: '',
+    blankrows: false,
+  });
+  const filtered = rows.filter((r: any[]) => r.some((c: any) => String(c).trim()));
+  if (filtered.length === 0) throw new Error('Excel 文件无内容');
+  return rowsToMarkdownTable(filtered);
+}
+
+/**
+ * 二维数组转 Markdown table 字符串。
+ */
+function rowsToMarkdownTable(rows: any[][]): string {
+  if (rows.length === 0) return '';
+  const header = rows[0].map((c) => String(c));
+  const align = header.map(() => '---');
+  const body = rows.slice(1).map((row) =>
+    header.map((_, i) => String(row[i] ?? '')).join(' | '),
+  );
+  return [
+    header.join(' | '),
+    align.join(' | '),
+    ...body,
+  ].join('\n');
 }
 
 /**

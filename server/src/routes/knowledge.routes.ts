@@ -11,6 +11,8 @@ import {
 } from '../ingestion/parser';
 import { publishDocumentProcessing } from '../queue/producer';
 import { cacheDelPattern } from '../cache/redis';
+import { describeImage } from '../ai/bailian';
+import { uploadImage } from '../storage/oss';
 
 const prisma = new PrismaClient();
 
@@ -30,22 +32,74 @@ const upload = multer({
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/markdown',
       'text/plain',
+      'text/csv',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     ];
     if (
       allowed.includes(file.mimetype) ||
-      file.originalname.endsWith('.md')
+      file.originalname.endsWith('.md') ||
+      file.originalname.endsWith('.csv') ||
+      file.originalname.endsWith('.xlsx')
     ) {
       cb(null, true);
     } else {
       cb(
         new AppError(
           ErrorCodes.DOCUMENT_PARSE_FAILED,
-          '不支持的文件格式，仅支持 PDF、Word、Markdown',
+          '不支持的文件格式，仅支持 PDF、Word、Markdown、CSV、Excel',
         ),
       );
     }
   },
 });
+
+/**
+ * 图片上传 multer 实例：仅 PNG/JPG，限制 5MB。
+ */
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['image/png', 'image/jpeg'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(
+        new AppError(
+          ErrorCodes.DOCUMENT_PARSE_FAILED,
+          '不支持的图片格式，仅支持 PNG、JPG',
+        ),
+      );
+    }
+  },
+});
+
+/**
+ * 包装 multer 中间件，将 MulterError（如文件过大）转为 AppError 中文提示。
+ */
+function handleDocUpload(req: AuthRequest, res: Response, next: NextFunction) {
+  upload.single('file')(req, res, (err: any) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return next(new AppError(ErrorCodes.DOCUMENT_PARSE_FAILED, '文件过大，最大支持 20MB'));
+      }
+      return next(new AppError(ErrorCodes.DOCUMENT_PARSE_FAILED, err.message || '文件上传失败'));
+    }
+    next();
+  });
+}
+
+function handleImageUpload(req: AuthRequest, res: Response, next: NextFunction) {
+  imageUpload.array('images', 10)(req, res, (err: any) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return next(new AppError(ErrorCodes.DOCUMENT_PARSE_FAILED, '图片过大，单张最大 5MB'));
+      }
+      return next(new AppError(ErrorCodes.DOCUMENT_PARSE_FAILED, err.message || '图片上传失败'));
+    }
+    next();
+  });
+}
 
 // ==================== Knowledge Bases ====================
 
@@ -198,7 +252,7 @@ function decodeFilename(name: string): string {
  * 发布 RabbitMQ（仅 entryId）→ Consumer 分块+Embedding → COMPLETED/FAILED。
  * 文件不落盘，全程在内存中处理。
  */
-router.post('/:id/entries/upload', upload.single('file'), async (req: AuthRequest, res: Response, next: NextFunction) => {
+router.post('/:id/entries/upload', handleDocUpload, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.file) {
       throw new AppError(ErrorCodes.DOCUMENT_PARSE_FAILED, '请选择文件');
@@ -226,7 +280,15 @@ router.post('/:id/entries/upload', upload.single('file'), async (req: AuthReques
     }
 
     // 在内存中解析文档文本
-    const text = await parseDocumentBuffer(buffer, fileName);
+    let text: string;
+    try {
+      text = await parseDocumentBuffer(buffer, fileName);
+    } catch (parseErr) {
+      throw new AppError(
+        ErrorCodes.DOCUMENT_PARSE_FAILED,
+        `文档解析失败: ${(parseErr as Error).message}`,
+      );
+    }
 
     // 创建 entry 并写入解析后的原文
     const entry = await prisma.knowledgeEntry.create({
@@ -253,8 +315,109 @@ router.post('/:id/entries/upload', upload.single('file'), async (req: AuthReques
       message: 'ok',
     });
   } catch (e) {
-    next(e);
+    if (e instanceof AppError) return next(e);
+    next(new AppError(ErrorCodes.DOCUMENT_PARSE_FAILED, (e as Error).message || '文件处理失败'));
   }
 });
+
+/**
+ * POST /:id/entries/upload-images — 批量上传图片。
+ *
+ * 流程：上传多张图片 → 存 OSS → 调用 qwen-vl-plus 生成描述 →
+ * 创建 KnowledgeEntry(content=描述+图片URL) → 异步 Embedding。
+ */
+router.post(
+  '/:id/entries/upload-images',
+  handleImageUpload,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      const kbId = req.params.id as string;
+      const userId = req.user!.id;
+      const files = req.files as Express.Multer.File[];
+
+      if (!files || files.length === 0) {
+        throw new AppError(ErrorCodes.DOCUMENT_PARSE_FAILED, '请选择图片');
+      }
+
+      // 先验证知识库归属
+      await knowledgeService.getKB(kbId, userId);
+
+      const results: Array<{ entry_id: string; title: string }> = [];
+
+      for (const file of files) {
+        const fileName = decodeFilename(file.originalname);
+        const fileHash = computeBufferHash(file.buffer);
+
+        // SHA256 去重
+        const existingEntry = await prisma.knowledgeEntry.findFirst({
+          where: { kbId, sourceFileHash: fileHash },
+        });
+        if (existingEntry) {
+          results.push({
+            entry_id: existingEntry.id,
+            title: fileName,
+          });
+          continue;
+        }
+
+        // 创建 entry 先获取 ID
+        const entry = await prisma.knowledgeEntry.create({
+          data: {
+            kbId,
+            title: fileName,
+            content: '', // 待填充
+            type: 'FILE',
+            processingStatus: 'PROCESSING',
+            sourceFileName: fileName,
+            sourceFileHash: fileHash,
+          },
+        });
+
+        try {
+          // 上传 OSS
+          const imageUrl = await uploadImage(userId, entry.id, file.buffer, file.mimetype);
+
+          // 调用视觉模型生成描述
+          const base64 = file.buffer.toString('base64');
+          const description = await describeImage(base64, file.mimetype);
+
+          // 拼接内容：描述 + 图片引用
+          const content = `${description}\n\n![](${imageUrl})`;
+
+          // 更新 entry content + 触发异步 Embedding
+          await prisma.knowledgeEntry.update({
+            where: { id: entry.id },
+            data: { content, processingStatus: 'PENDING' },
+          });
+
+          await publishDocumentProcessing(entry.id, content);
+
+          results.push({ entry_id: entry.id, title: fileName });
+        } catch (err) {
+          // 视觉模型或 OSS 失败时标记为 FAILED
+          await prisma.knowledgeEntry.update({
+            where: { id: entry.id },
+            data: {
+              processingStatus: 'FAILED',
+              processingMessage: `图片处理失败: ${(err as Error).message}`,
+            },
+          });
+          results.push({ entry_id: entry.id, title: fileName });
+        }
+      }
+
+      await cacheDelPattern(`entry:${kbId}:*`);
+
+      res.json({
+        code: 0,
+        data: { entries: results },
+        message: 'ok',
+      });
+    } catch (e) {
+      if (e instanceof AppError) return next(e);
+      next(new AppError(ErrorCodes.DOCUMENT_PARSE_FAILED, (e as Error).message || '图片处理失败'));
+    }
+  },
+);
 
 export default router;
