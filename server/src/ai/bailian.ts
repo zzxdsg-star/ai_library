@@ -83,7 +83,7 @@ export async function getEmbeddings(texts: string[]): Promise<number[][]> {
  * 使用 LangChain ChatOpenAI 的多模态 content 格式
  * （数组，包含 text 和 image_url 两种 block）。
  */
-export async function describeImage(base64Image: string, mimeType: string): Promise<string> {
+export async function describeImage(base64Image: string, mimeType: string, context?: string): Promise<string> {
   const visionModel = new ChatOpenAI({
     model: config.bailian.visionModel,
     apiKey: config.bailian.apiKey,
@@ -92,14 +92,16 @@ export async function describeImage(base64Image: string, mimeType: string): Prom
     maxTokens: 512,
   });
 
+  const hasContext = context && context.trim();
+  const prompt = hasContext
+    ? `请结合以下文档上下文，用中文详细描述这张图片的内容（包括关键信息、主体、场景和重要细节，约100-200字）。只输出描述文字，不要加"这张图片"开头。\n\n文档上下文：\n${context.slice(0, 1500)}`
+    : '请用中文详细描述这张图片的内容，包括关键信息、主体、场景和重要细节，约100-200字。只输出描述文字，不要加"这张图片"开头。';
+
   const response = await visionModel.invoke([
     {
       role: 'user',
       content: [
-        {
-          type: 'text',
-          text: '请用中文详细描述这张图片的内容，包括关键信息、主体、场景和重要细节，约100-200字。只输出描述文字，不要加"这张图片"开头。',
-        },
+        { type: 'text', text: prompt },
         {
           type: 'image_url',
           image_url: { url: `data:${mimeType};base64,${base64Image}` },

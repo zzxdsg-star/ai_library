@@ -249,7 +249,7 @@ function decodeFilename(name: string): string {
  * POST /:id/entries/upload — 文档上传 + 内存解析 + 异步入库。
  *
  * 流程：上传 → 内存解析文本 → SHA256 去重 → 创建 entry（含原文）→
- * 发布 RabbitMQ（仅 entryId）→ Consumer 分块+Embedding → COMPLETED/FAILED。
+ * 发布 RabbitMQ → Consumer 分块+Embedding → COMPLETED/FAILED。
  * 文件不落盘，全程在内存中处理。
  */
 router.post('/:id/entries/upload', handleDocUpload, async (req: AuthRequest, res: Response, next: NextFunction) => {

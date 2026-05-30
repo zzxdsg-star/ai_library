@@ -37,7 +37,7 @@ export async function uploadImage(
  * 删除 OSS 上的图片。入口不存在时忽略（幂等）。
  */
 export async function deleteImage(userId: string, entryId: string): Promise<void> {
-  // 尝试两种扩展名，文件名不固定时两种都删
+  // 尝试两种扩展名
   const keys = [
     `ai-library/images/${userId}/${entryId}.jpg`,
     `ai-library/images/${userId}/${entryId}.png`,
@@ -46,7 +46,7 @@ export async function deleteImage(userId: string, entryId: string): Promise<void
     try {
       await client.delete(key);
     } catch {
-      // 文件不存在时忽略，其他情况不影响主流程
+      // 文件不存在时忽略
     }
   }
 }

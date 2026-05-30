@@ -174,7 +174,8 @@ export class KnowledgeService {
     await prisma.knowledgeEntry.delete({ where: { id: entryId } });
     // 异步清理 OSS 图片（不阻塞响应）
     deleteImage(userId, entryId).catch((err) => console.error('OSS 删除失败:', err));
-    await Promise.all([cacheDelPattern(`entry:${entry.kbId}:*`), cacheDel(`entry:detail:${entryId}`)]);
+    // 同时失效分析统计缓存，确保热度排行实时反映删除变化
+    await Promise.all([cacheDelPattern(`entry:${entry.kbId}:*`), cacheDel(`entry:detail:${entryId}`), cacheDelPattern('analytics:*')]);
   }
 
   async updateEntryStatus(entryId: string, userId: string, status: 'ENABLED' | 'DISABLED') {

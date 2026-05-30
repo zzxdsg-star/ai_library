@@ -43,7 +43,9 @@ export class AuthService {
   }
 
   async login(username: string, password: string) {
-    const user = await prisma.user.findUnique({ where: { username } });
+    const user = await prisma.user.findFirst({
+      where: { OR: [{ username }, { email: username }] },
+    });
     if (!user) {
       throw new AppError(
         ErrorCodes.INVALID_CREDENTIALS,
