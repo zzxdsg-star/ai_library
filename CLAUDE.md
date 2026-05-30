@@ -82,19 +82,17 @@ node vision.js "<图片路径>" "用中文描述这张图片"
 
 用户直接发图片，自动识图，无需手动打命令。
 
-## 当前状态
+## 当前状态（2026-05-30）
 
-- 设计阶段完成（2026-05-25），spec + plan 已定稿
-- 全部 21 个 Task 已实现（2026-05-26），前端 + 后端代码均已就绪
-- 已连接基础设施并启动验证，Demo 可运行
-- Redis 缓存落地（4 种 Key，空列表不缓存，SCAN 模式删除）
+- 全部 21 个 Task + 4 个加分项已全部完成
+- Redis 缓存覆盖全部场景（知识库列表/详情、条目列表/详情、会话列表、消息历史、分析统计、自动提炼时间戳），共 8 种 Key
 - 热度统计与可视化（ECharts 柱状图+环形图+概览卡片，全局页+单库 Tab，5 分钟刷新）
-- 错误提示优化（multer 文件过大中文提示、解析错误消息透传）
-- 文件上传支持 PDF/Word/Markdown/TXT/CSV/Excel，内存解析不落盘
-- CSV/Excel 自动解析为 Markdown table 入库
-- 独立图片上传：OSS 存储 + qwen-vl-plus 视觉识别生成描述
-- 手动录入 Markdown 分栏编辑器（左写右实时预览）
-- 条目预览弹窗（Markdown 渲染 / 图片展示），PDF/DOCX 不开放预览
-- 编辑条目时文件后缀锁死，只允许改标题主体
-- **剩余加分项**：自动提炼知识、一键生成专家 Agent
+- 多模态：图片 OSS 存储 + qwen-vl-plus 视觉识别 + CSV/Excel Markdown table + Markdown 分栏编辑器
+- 验证码登录注册（数学 SVG + Redis 5 分钟过期 + 一次性使用）
+- 自动知识提炼（手动 + node-schedule 凌晨 4:30 定时，分会话并行提炼，SHA256+标题去重，200 字过滤）
+- 条目详情抽屉、批量删除、预览权限控制
+- embedding 模型已升级为 text-embedding-v3（1024 维）
+
+### 延后迭代
+- PDF/DOCX 内嵌图片识别（pdfjs-dist v5 兼容问题）
 - **延后迭代**：PDF/DOCX 内嵌图片识别（pdfjs-dist v5 兼容问题）

@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Button, Typography } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
+import { Button, Typography, App, Tooltip } from 'antd';
+import { ArrowLeftOutlined, ThunderboltOutlined } from '@ant-design/icons';
 import type { AppDispatch, RootState } from '../store';
 import {
   fetchSessions,
@@ -26,6 +26,28 @@ export default function ChatPage() {
     (s: RootState) => s.chat,
   );
   const { streaming, streamContent, startStream } = useSSE();
+  const { message } = App.useApp();
+  const [extracting, setExtracting] = useState(false);
+
+  const handleExtract = async () => {
+    if (!id) return;
+    setExtracting(true);
+    try {
+      const res = await chatApi.extractKnowledge(id, sid);
+      if (res.code === 0) {
+        if (res.data.count > 0) {
+          message.success(`成功提炼 ${res.data.count} 条新知识`);
+        } else {
+          message.info(res.message || '未提炼到新知识');
+        }
+      } else {
+        message.error(res.message || '提炼失败');
+      }
+    } catch {
+      message.error('提炼失败，请重试');
+    }
+    setExtracting(false);
+  };
 
   useEffect(() => {
     dispatch(resetChat());
@@ -39,8 +61,8 @@ export default function ChatPage() {
   }, [sid, id, dispatch]);
 
   const handleCreateSession = async () => {
-    await dispatch(createSession(id!));
-    dispatch(fetchSessions(id!));
+    const res = await dispatch(createSession(id!)).unwrap();
+    navigate(`/knowledge-bases/${id}/chat/${res.id}`);
   };
 
   const handleSelectSession = (sid: string) => {
@@ -111,9 +133,21 @@ export default function ChatPage() {
           >
             返回
           </Button>
-          <Typography.Title level={5} style={{ margin: 0 }}>
-            对话列表
-          </Typography.Title>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography.Title level={5} style={{ margin: 0 }}>对话列表</Typography.Title>
+            <Tooltip title={sid ? '提炼当前对话的知识' : '提炼所有对话的知识'}>
+              <Button
+                type="link"
+                size="small"
+                icon={<ThunderboltOutlined />}
+                loading={extracting}
+                onClick={handleExtract}
+                style={{ color: '#b8860b', fontWeight: 500 }}
+              >
+                提炼知识
+              </Button>
+            </Tooltip>
+          </div>
         </div>
         <div style={{ flex: 1, overflow: 'auto' }}>
           <SessionList

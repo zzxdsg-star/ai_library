@@ -11,7 +11,7 @@ export const config = {
   rabbitmqUrl: process.env.RABBITMQ_URL || 'amqp://localhost:5672',
   bailian: {
     apiKey: process.env.BAILIAN_API_KEY || '',
-    embeddingModel: 'text-embedding-v2',
+    embeddingModel: 'text-embedding-v3',
     llmModel: 'qwen-plus',
     visionModel: 'qwen-vl-plus',
   },

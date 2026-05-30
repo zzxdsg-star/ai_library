@@ -5,7 +5,7 @@
  * ChatOpenAI 和 OpenAIEmbeddings 并指向百炼的 baseURL。
  *
  * 封装两项核心能力：
- * 1. getEmbedding — 文本向量化（text-embedding-v2, 1536 维）
+ * 1. getEmbedding — 文本向量化（text-embedding-v3, 1024 维）
  * 2. streamChat   — LLM 流式对话（qwen-plus）
  *
  * 选型说明（使用 LangChain）：
@@ -21,14 +21,14 @@ const BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 
 /**
  * LangChain Embeddings 实例。
- * 百炼 text-embedding-v2 模型输出 1536 维向量。
- * 构建函数参数 dimensions=1536 显式声明，确保与 pgvector 存储一致。
+ * 百炼 text-embedding-v3 模型，默认 1024 维向量。
+ * 构建函数参数 dimensions=1024 显式声明，确保与 pgvector 存储一致。
  */
 const embeddings = new OpenAIEmbeddings({
   model: config.bailian.embeddingModel,
   apiKey: config.bailian.apiKey,
   configuration: { baseURL: BASE_URL },
-  dimensions: 1536,
+  dimensions: 1024,
 });
 
 /**
@@ -59,12 +59,11 @@ export async function getEmbedding(text: string): Promise<number[]> {
 /**
  * 批量文本向量化，分批调用以适配百炼 API 限制。
  *
- * 百炼 embedding 接口单次最多接受 25 条文本，
- * 超过则报：batch size is invalid, it should not be larger than 25
- * 此处按每批 20 条拆分（留余量），逐批调用后合并结果。
+ * 百炼 text-embedding-v3 单次最多接受 10 条文本。
+ * 此处按每批 10 条拆分，逐批调用后合并结果。
  */
 export async function getEmbeddings(texts: string[]): Promise<number[][]> {
-  const BATCH_SIZE = 20;
+  const BATCH_SIZE = 10;
   const results: number[][] = [];
 
   for (let i = 0; i < texts.length; i += BATCH_SIZE) {
@@ -116,6 +115,32 @@ export async function describeImage(base64Image: string, mimeType: string, conte
       ? response.content.map((c: any) => c.text || '').join('')
       : '';
   return content.trim();
+}
+
+/**
+ * 非流式 LLM 对话（返回完整结果）。
+ * 用于知识提炼等需要一次性获取完整响应的场景。
+ */
+export async function chat(
+  messages: Array<{ role: string; content: string }>,
+  temperature?: number,
+): Promise<string> {
+  const model = temperature !== undefined
+    ? new ChatOpenAI({
+        model: config.bailian.llmModel,
+        apiKey: config.bailian.apiKey,
+        configuration: { baseURL: BASE_URL },
+        temperature,
+        maxTokens: 2048,
+      })
+    : chatModel;
+  const response = await model.invoke(
+    messages.map((m) => ({
+      role: m.role as 'system' | 'user' | 'assistant',
+      content: m.content,
+    })),
+  );
+  return typeof response.content === 'string' ? response.content : '';
 }
 
 /**

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Modal, Form, Input, Button, App, Space } from 'antd';
+import { Modal, Form, Input, Button, App } from 'antd';
 import { useDispatch } from 'react-redux';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -71,14 +71,10 @@ export default function EntryEditor({ open, kbId, entry, onClose, onSaved }: Pro
     >
       <Form form={form} layout="vertical" onFinish={handleSubmit} validateTrigger="onBlur">
         <Form.Item name="title" label="标题" rules={[{ required: true }]}>
-          {hasExtension ? (
-            <Space.Compact style={{ width: '100%' }}>
-              <Input placeholder="知识标题" />
-              <Input value={`.${sourceExt}`} disabled style={{ width: 60, color: '#999', textAlign: 'center' }} />
-            </Space.Compact>
-          ) : (
-            <Input placeholder="知识标题" />
-          )}
+          <Input
+            placeholder="知识标题"
+            suffix={hasExtension ? <span style={{ color: '#999' }}>.{sourceExt}</span> : undefined}
+          />
         </Form.Item>
 
         {!isEditing && (

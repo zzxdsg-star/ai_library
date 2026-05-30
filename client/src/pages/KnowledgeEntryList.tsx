@@ -32,6 +32,7 @@ export default function KnowledgeEntryList() {
   const [previewEntry, setPreviewEntry] = useState<KnowledgeEntry | null>(null);
   const [detailEntry, setDetailEntry] = useState<KnowledgeEntry | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
 
   useEffect(() => { if (id) dispatch(fetchEntries({ kbId: id, page, search, status: statusFilter })); },
     [id, page, search, statusFilter, dispatch]);
@@ -72,6 +73,21 @@ export default function KnowledgeEntryList() {
         setDetailOpen(true);
       }
     } catch { /* ignore */ }
+  };
+
+  const handleBatchDelete = () => {
+    modal.confirm({
+      title: '批量删除', okText: '确认', cancelText: '取消',
+      content: `确定要删除选中的 ${selectedRowKeys.length} 个条目吗？`,
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        for (const eid of selectedRowKeys) {
+          await dispatch(deleteEntry({ kbId: id!, eid }));
+        }
+        message.success(`已删除 ${selectedRowKeys.length} 个条目`);
+        setSelectedRowKeys([]);
+      },
+    });
   };
 
   const handleToggleStatus = async (entry: KnowledgeEntry) => {
@@ -161,6 +177,11 @@ export default function KnowledgeEntryList() {
                 <Space>
                   <Input.Search placeholder="搜索条目..." allowClear style={{ width: 280 }} value={search} onChange={(e) => dispatch(setSearch(e.target.value))} />
                   <Select placeholder="状态筛选" allowClear style={{ width: 130 }} value={statusFilter || undefined} onChange={(v) => dispatch(setStatusFilter(v || ''))} options={[{ value: 'ENABLED', label: '可用' }, { value: 'DISABLED', label: '不可用' }]} />
+                  {selectedRowKeys.length > 0 && (
+                    <Button danger type="primary" onClick={handleBatchDelete}>
+                      删除选中 ({selectedRowKeys.length})
+                    </Button>
+                  )}
                 </Space>
                 <Space>
                   <Button icon={<UploadOutlined />} onClick={() => setUploadOpen(true)} style={{ borderRadius: 10 }}>上传文档</Button>
@@ -169,6 +190,7 @@ export default function KnowledgeEntryList() {
               </div>
               <div style={{ background: '#fff', borderRadius: 10, padding: '0 4px', boxShadow: '0 4px 16px rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.03)' }}>
                 <Table dataSource={list} columns={columns} rowKey="id" loading={loading}
+                  rowSelection={{ selectedRowKeys, onChange: (keys) => setSelectedRowKeys(keys as string[]) }}
                   pagination={{ total, current: page, pageSize: 10, onChange: (p) => dispatch(setPage(p)), showTotal: (t) => `共 ${t} 条` }} />
               </div>
             </>

@@ -15,4 +15,10 @@ export const chatApi = {
       `/knowledge-bases/${kbId}/chat/sessions/${sid}/messages`,
       { content },
     ),
+  /** 从对话中提炼知识 */
+  extractKnowledge: (kbId: string, sessionId?: string) =>
+    post<{ entries: Array<{ id: string; title: string }>; count: number }>(
+      `/knowledge-bases/${kbId}/chat/extract`,
+      { sessionId },
+    ),
 };

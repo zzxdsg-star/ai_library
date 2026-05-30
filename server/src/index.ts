@@ -23,6 +23,7 @@ import chatRoutes from './routes/chat.routes';
 import analyticsRoutes from './routes/analytics.routes';
 import debugRoutes from './routes/debug.routes';
 import { startConsumer } from './queue/consumer';
+import { startAutoExtract } from './services/autoextract.service';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/knowledge-bases', knowledgeRoutes);
@@ -40,5 +41,8 @@ app.listen(config.port, () => {
 startConsumer().catch((err) => {
   console.error('[Consumer] Failed to start:', err.message);
 });
+
+// 启动自动知识提炼定时任务
+startAutoExtract();
 
 export default app;

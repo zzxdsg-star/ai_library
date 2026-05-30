@@ -4,6 +4,10 @@ import { chatService } from '../services/chat.service';
 import { knowledgeService } from '../services/knowledge.service';
 import { hybridSearch } from '../rag/retriever';
 import { generateAnswer } from '../rag/generator';
+import { chat } from '../ai/bailian';
+import { cacheDelPattern } from '../cache/redis';
+import { publishDocumentProcessing } from '../queue/producer';
+import { computeBufferHash } from '../ingestion/parser';
 
 const router = Router();
 router.use(authMiddleware);
@@ -140,6 +144,125 @@ router.post('/:id/chat/sessions/:sid/messages', async (req: AuthRequest, res: Re
       );
       res.end();
     }
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * POST /:id/chat/extract — 从对话中提炼新知识。
+ *
+ * 读取知识库下所有对话消息 → 发给 qwen-plus 分析 → 解析出知识点 →
+ * 批量创建 KnowledgeEntry → 返回创建结果。
+ * 可选传 sessionId 限定单会话。
+ */
+router.post('/:id/chat/extract', async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const kbId = req.params.id as string;
+    const userId = req.user!.id;
+    const { sessionId } = req.body || {};
+
+    // 1. 验证知识库归属
+    await knowledgeService.getKB(kbId, userId);
+
+    // 2. 收集对话消息
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+
+    type ChatMessage = { role: string; content: string; createdAt: Date; sessionId: string };
+    const allMessages = await prisma.chatMessage.findMany({
+      where: sessionId
+        ? { session: { id: sessionId, kbId, userId } }
+        : { session: { kbId, userId } },
+      orderBy: { createdAt: 'asc' },
+      select: { role: true, content: true, createdAt: true, sessionId: true },
+    });
+
+    if (allMessages.length === 0) {
+      res.json({ code: 0, data: { entries: [] }, message: '没有对话记录可提炼' });
+      return;
+    }
+
+    // 3. 分会话提取（每个会话独立提炼，互不干扰）
+    const sessions = new Map<string, ChatMessage[]>();
+    for (const m of allMessages) {
+      const list = sessions.get(m.sessionId) || [];
+      list.push(m);
+      sessions.set(m.sessionId, list);
+    }
+
+    const systemPrompt = `你是一个知识提炼专家。请分析以下对话记录，从中提取出有价值的知识点。要求：
+1. 标题用 "## " 开头，正文用 Markdown 格式，正文不少于 200 字
+2. 正文包含核心要点和关键信息
+3. 各知识点之间用 "---" 分隔
+4. 忽略纯闲聊和问候
+5. 如果没有可提炼的知识，返回 "NONE"`;
+
+    const extractSession = async (msgs: ChatMessage[]): Promise<string[]> => {
+      const text = msgs
+        .reverse()
+        .map((m) => `[${m.role === 'USER' ? '用户' : 'AI'}] ${m.content.slice(0, 800)}`)
+        .join('\n\n');
+      const preview = text.slice(0, 16000);
+
+      const response = await chat([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `对话记录：\n${preview}` },
+      ], 0.3);
+
+      if (!response || response.trim() === 'NONE') return [];
+      return response.split('---').map((s: string) => s.trim()).filter(Boolean);
+    };
+
+    // 4. 并行调用 LLM，每个会话独立提炼
+    const allSections = (
+      await Promise.all(
+        Array.from(sessions.values()).map((msgs) => extractSession(msgs)),
+      )
+    ).flat();
+
+    // 5. 解析并入库
+    const createdEntries: Array<{ id: string; title: string }> = [];
+
+    for (const section of allSections) {
+      const titleMatch = section.match(/^##\s+(.+)/);
+      if (!titleMatch) continue;
+      const title = titleMatch[1].trim().slice(0, 200);
+      const content = section.replace(/^##\s+.+\n?/, '').trim();
+      if (!content || content.length < 200) continue;
+
+      try {
+        const existingByTitle = await prisma.knowledgeEntry.findFirst({
+          where: { kbId, title },
+        });
+        if (existingByTitle) continue;
+
+        const contentHash = computeBufferHash(Buffer.from(content));
+        const existingByHash = await prisma.knowledgeEntry.findFirst({
+          where: { kbId, sourceFileHash: contentHash },
+        });
+        if (existingByHash) continue;
+
+        const entry = await prisma.knowledgeEntry.create({
+          data: {
+            kbId, title, content,
+            type: 'MANUAL',
+            processingStatus: 'PENDING',
+            sourceFileHash: contentHash,
+          },
+        });
+        await publishDocumentProcessing(entry.id, content);
+        createdEntries.push({ id: entry.id, title });
+      } catch { /* 单条失败不影响其他 */ }
+    }
+
+    await cacheDelPattern(`entry:${kbId}:*`);
+
+    res.json({
+      code: 0,
+      data: { entries: createdEntries, count: createdEntries.length },
+      message: createdEntries.length > 0 ? `成功提炼 ${createdEntries.length} 条知识` : '未提炼到新知识',
+    });
   } catch (e) {
     next(e);
   }

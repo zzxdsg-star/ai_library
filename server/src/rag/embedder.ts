@@ -17,10 +17,9 @@ export async function embedText(text: string): Promise<number[]> {
  * 使用 Prisma 原生 SQL INSERT 以支持 pgvector vector 类型。
  * 事务包裹确保同一 entry 的所有 chunk 原子写入。
  *
- * 选型说明（text-embedding-v2）：
- * 阿里云百炼第二代 Embedding 模型，1536 维输出。
- * v2 在中文语义理解（C-MTEB 基准）上显著优于 v1，
- * 1536 维在召回精度和存储成本间取平衡。
+ * 选型说明（text-embedding-v3）：
+ * 阿里云百炼第三代 Embedding 模型，1024 维输出。
+ * v3 在中文语义理解上优于 v2，1024 维在召回精度和存储成本间取平衡。
  */
 export async function embedAndStoreChunks(
   entryId: string,
