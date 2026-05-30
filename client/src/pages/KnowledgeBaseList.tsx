@@ -186,7 +186,7 @@ export default function KnowledgeBaseList() {
         footer={null}
         width={520}
       >
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+        <Form form={form} layout="vertical" onFinish={handleSubmit} validateTrigger="onBlur">
           <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入知识库名称' }]}>
             <Input placeholder="输入知识库名称" style={{ borderRadius: 10, height: 42 }} />
           </Form.Item>

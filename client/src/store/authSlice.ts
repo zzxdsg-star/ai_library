@@ -16,7 +16,7 @@ const initialState: AuthState = {
 
 export const login = createAsyncThunk(
   'auth/login',
-  async (data: LoginRequest) => {
+  async (data: LoginRequest & { captchaId?: string; captchaCode?: string }) => {
     const res = await authApi.login(data);
     return res.data;
   },
@@ -24,7 +24,7 @@ export const login = createAsyncThunk(
 
 export const register = createAsyncThunk(
   'auth/register',
-  async (data: RegisterRequest) => {
+  async (data: RegisterRequest & { captchaId?: string; captchaCode?: string }) => {
     const res = await authApi.register(data);
     return res.data;
   },

@@ -44,7 +44,6 @@ export default function ChatPage() {
   };
 
   const handleSelectSession = (sid: string) => {
-    dispatch(fetchMessages({ kbId: id!, sid }));
     navigate(`/knowledge-bases/${id}/chat/${sid}`);
   };
 

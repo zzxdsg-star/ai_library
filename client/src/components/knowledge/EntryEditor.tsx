@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Modal, Form, Input, Button, App } from 'antd';
+import { Modal, Form, Input, Button, App, Space } from 'antd';
 import { useDispatch } from 'react-redux';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -22,26 +22,35 @@ export default function EntryEditor({ open, kbId, entry, onClose, onSaved }: Pro
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const isEditing = !!entry;
+
+  // 编辑模式下提取文件后缀（不可修改）
+  const sourceExt = entry?.source_file_name?.split('.').pop()?.toLowerCase();
+  const hasExtension = isEditing && !!sourceExt;
+
   const [previewContent, setPreviewContent] = useState('');
 
   useEffect(() => {
     if (open) {
       if (entry) {
-        form.setFieldsValue({ title: entry.title });
+        const baseName = hasExtension
+          ? entry.title.slice(0, -(sourceExt.length + 1)) // 去掉 .ext
+          : entry.title;
+        form.setFieldsValue({ title: baseName });
       } else {
         form.resetFields();
       }
       setPreviewContent('');
     }
-  }, [open, entry, form]);
+  }, [open, entry, form, hasExtension, sourceExt]);
 
   const handleSubmit = async (values: { title: string; content?: string }) => {
     try {
+      const title = hasExtension ? `${values.title}.${sourceExt}` : values.title;
       if (isEditing && entry) {
-        await dispatch(updateEntry({ kbId, eid: entry.id, data: { title: values.title } })).unwrap();
+        await dispatch(updateEntry({ kbId, eid: entry.id, data: { title } })).unwrap();
         message.success('更新成功');
       } else {
-        await dispatch(createEntry({ kbId, data: { title: values.title, content: values.content || '' } })).unwrap();
+        await dispatch(createEntry({ kbId, data: { title, content: values.content || '' } })).unwrap();
         message.success('创建成功');
       }
       form.resetFields();
@@ -60,9 +69,16 @@ export default function EntryEditor({ open, kbId, entry, onClose, onSaved }: Pro
       footer={null}
       width={isEditing ? 500 : 960}
     >
-      <Form form={form} layout="vertical" onFinish={handleSubmit}>
+      <Form form={form} layout="vertical" onFinish={handleSubmit} validateTrigger="onBlur">
         <Form.Item name="title" label="标题" rules={[{ required: true }]}>
-          <Input placeholder="知识标题" />
+          {hasExtension ? (
+            <Space.Compact style={{ width: '100%' }}>
+              <Input placeholder="知识标题" />
+              <Input value={`.${sourceExt}`} disabled style={{ width: 60, color: '#999', textAlign: 'center' }} />
+            </Space.Compact>
+          ) : (
+            <Input placeholder="知识标题" />
+          )}
         </Form.Item>
 
         {!isEditing && (

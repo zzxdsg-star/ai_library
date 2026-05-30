@@ -28,7 +28,12 @@ client.interceptors.response.use(
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
-    return Promise.reject(error);
+    // 提取服务端返回的错误消息，避免前端拿到 axios 默认的 "Request failed with status code 400"
+    const message =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      error.message;
+    return Promise.reject(new Error(message));
   },
 );
 

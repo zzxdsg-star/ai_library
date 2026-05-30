@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Table, Button, Input, Select, Space, Tag, Typography, Tooltip, App, Tabs, Spin, Empty, Modal,
+  Table, Button, Input, Select, Space, Tag, Typography, Tooltip, App, Tabs, Spin, Empty, Modal, Drawer,
 } from 'antd';
 import { PlusOutlined, UploadOutlined, MessageOutlined, ArrowLeftOutlined, EyeOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
@@ -16,6 +16,7 @@ import {
 import EntryEditor from '../components/knowledge/EntryEditor';
 import FileUpload from '../components/knowledge/FileUpload';
 import { analyticsApi, type KBStatsData } from '../api/analytics.api';
+import { knowledgeApi } from '../api/knowledge.api';
 import type { KnowledgeEntry } from 'shared';
 
 export default function KnowledgeEntryList() {
@@ -29,6 +30,8 @@ export default function KnowledgeEntryList() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('list');
   const [previewEntry, setPreviewEntry] = useState<KnowledgeEntry | null>(null);
+  const [detailEntry, setDetailEntry] = useState<KnowledgeEntry | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   useEffect(() => { if (id) dispatch(fetchEntries({ kbId: id, page, search, status: statusFilter })); },
     [id, page, search, statusFilter, dispatch]);
@@ -61,13 +64,27 @@ export default function KnowledgeEntryList() {
     });
   };
 
+  const handleOpenDetail = async (entry: KnowledgeEntry) => {
+    try {
+      const res = await knowledgeApi.getEntry(id!, entry.id);
+      if (res.code === 0) {
+        setDetailEntry(res.data);
+        setDetailOpen(true);
+      }
+    } catch { /* ignore */ }
+  };
+
   const handleToggleStatus = async (entry: KnowledgeEntry) => {
     const newStatus = entry.status === 'ENABLED' ? 'DISABLED' : 'ENABLED';
     await dispatch(toggleEntryStatus({ kbId: id!, eid: entry.id, status: newStatus }));
   };
 
   const columns = [
-    { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true, render: (t: string) => <span style={{ fontWeight: 500 }}>{t}</span> },
+    { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true,
+      render: (t: string, record: KnowledgeEntry) => (
+        <a style={{ fontWeight: 500 }} onClick={() => handleOpenDetail(record)}>{t}</a>
+      ),
+    },
     { title: '类型', dataIndex: 'type', key: 'type', width: 80,
       render: (t: string, record: KnowledgeEntry) => {
         const isImage = /\.(png|jpg|jpeg)$/i.test(record.source_file_name || '');
@@ -98,12 +115,26 @@ export default function KnowledgeEntryList() {
     { title: '更新时间', dataIndex: 'updated_at', key: 'updated_at', width: 170,
       render: (d: string) => new Date(d).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) },
     { title: '操作', key: 'actions', width: 220, align: 'center' as const,
-      render: (_: unknown, record: KnowledgeEntry) => (
-        <Space>
-          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setPreviewEntry(record)}>预览</Button>
-          <Button type="link" size="small" onClick={() => { setEditingEntry(record); setEditorOpen(true); }}>编辑</Button>
-          <Button type="link" size="small" danger onClick={() => handleDelete(record.id, record.title)}>删除</Button>
-        </Space>),
+      render: (_: unknown, record: KnowledgeEntry) => {
+        const ext = (record.source_file_name || '').split('.').pop()?.toLowerCase();
+        const noExt = !ext; // 手动录入，无后缀
+        const canPreview = noExt || ext === 'md' || ext === 'txt' || ext === 'png' || ext === 'jpg' || ext === 'jpeg';
+        const noPreview = ext === 'csv' || ext === 'xlsx' || ext === 'pdf' || ext === 'docx';
+        return (
+          <Space>
+            {canPreview && (
+              <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => setPreviewEntry(record)}>预览</Button>
+            )}
+            {noPreview && (
+              <Tooltip title="暂不支持预览此类型文件">
+                <Button type="link" size="small" icon={<EyeOutlined />} disabled>预览</Button>
+              </Tooltip>
+            )}
+            <Button type="link" size="small" onClick={() => { setEditingEntry(record); setEditorOpen(true); }}>编辑</Button>
+            <Button type="link" size="small" danger onClick={() => handleDelete(record.id, record.title)}>删除</Button>
+          </Space>
+        );
+      },
     },
   ];
 
@@ -153,6 +184,20 @@ export default function KnowledgeEntryList() {
         onUploaded={() => { setUploadOpen(false); dispatch(fetchEntries({ kbId: id!, page: 1, search, status: statusFilter })); }} />
 
       <EntryPreview entry={previewEntry} onClose={() => setPreviewEntry(null)} />
+
+      <Drawer
+        title={
+          <Typography.Text style={{ fontWeight: 600, fontSize: 16 }} ellipsis={{ tooltip: detailEntry?.title }}>
+            {detailEntry?.title || '知识详情'}
+          </Typography.Text>
+        }
+        open={detailOpen}
+        onClose={() => { setDetailOpen(false); setDetailEntry(null); }}
+        width={720}
+        styles={{ body: { padding: '20px 28px', background: '#fefdf9' } }}
+      >
+        {detailEntry && <DetailContent entry={detailEntry} />}
+      </Drawer>
     </div>
   );
 }
@@ -185,11 +230,6 @@ function EntryPreview({ entry, onClose }: { entry: KnowledgeEntry | null; onClos
       {imageEntry && imageUrl ? (
         <div style={{ textAlign: 'center' }}>
           <img src={imageUrl} alt={entry.title} style={{ maxWidth: '100%', maxHeight: '70vh', borderRadius: 12 }} />
-          {entry.content && (
-            <div style={{ marginTop: 16, color: '#666', fontSize: 13, lineHeight: 1.8, textAlign: 'left' }}>
-              {entry.content.replace(/!\[.*?\]\([^)]+\)/, '').trim()}
-            </div>
-          )}
         </div>
       ) : (
         <div className="markdown-body" style={{ maxHeight: '70vh', overflow: 'auto', padding: '8px 4px' }}>
@@ -199,6 +239,81 @@ function EntryPreview({ entry, onClose }: { entry: KnowledgeEntry | null; onClos
         </div>
       )}
     </Modal>
+  );
+}
+
+/** 条目详情抽屉内容 */
+function DetailContent({ entry }: { entry: KnowledgeEntry }) {
+  const ext = (entry.source_file_name || '').split('.').pop()?.toLowerCase();
+  const noExt = !ext;
+  const canShow = noExt || ext === 'md' || ext === 'txt' || ext === 'png' || ext === 'jpg' || ext === 'jpeg';
+  const imageEntry = ext === 'png' || ext === 'jpg' || ext === 'jpeg';
+  const imageUrl = imageEntry ? extractImageUrl(entry.content) : null;
+
+  return (
+    <div>
+      {/* 元信息行 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <Space>
+          {imageEntry ? (
+            <Tag color="orange">图片</Tag>
+          ) : (
+            <Tag color={entry.type === 'MANUAL' ? 'blue' : 'purple'}>
+              {entry.type === 'MANUAL' ? '手动' : '文件'}
+            </Tag>
+          )}
+          <Tag color={entry.status === 'ENABLED' ? 'success' : 'error'}>
+            {entry.status === 'ENABLED' ? '可用' : '不可用'}
+          </Tag>
+          {entry.source_file_name && !imageEntry && (
+            <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+              来源: {entry.source_file_name}
+            </Typography.Text>
+          )}
+        </Space>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          {new Date(entry.created_at).toLocaleString('zh-CN')}
+        </Typography.Text>
+      </div>
+
+      {/* 分隔线 */}
+      <div style={{ borderTop: '1px solid #e8e0d0', paddingTop: 20 }} />
+
+      {/* 内容区 */}
+      {canShow ? (
+        imageEntry && imageUrl ? (
+          <div style={{ textAlign: 'center', padding: '16px 0' }}>
+            <img src={imageUrl} alt={entry.title}
+              style={{ maxWidth: '100%', maxHeight: '60vh', borderRadius: 14,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} />
+          </div>
+        ) : (
+          <div
+            className="markdown-body"
+            style={{
+              background: '#fff',
+              borderRadius: 12,
+              padding: '20px 24px',
+              border: '1px solid #f0ebe0',
+              lineHeight: 1.8,
+            }}
+          >
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {entry.content}
+            </ReactMarkdown>
+          </div>
+        )
+      ) : (
+        <Empty
+          description={
+            <span style={{ color: '#999', fontSize: 14 }}>
+              该类型文件暂不支持内容预览
+            </span>
+          }
+          style={{ marginTop: 40 }}
+        />
+      )}
+    </div>
   );
 }
 

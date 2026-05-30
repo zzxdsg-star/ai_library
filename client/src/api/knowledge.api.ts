@@ -34,6 +34,9 @@ export const knowledgeApi = {
       search,
       status,
     }),
+  getEntry: (kbId: string, eid: string) =>
+    get<KnowledgeEntry>(`/knowledge-bases/${kbId}/entries/${eid}`),
+
   updateEntry: (
     kbId: string,
     eid: string,

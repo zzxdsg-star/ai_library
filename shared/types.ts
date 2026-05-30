@@ -9,12 +9,16 @@ export interface User {
 export interface LoginRequest {
   username: string;
   password: string;
+  captchaId?: string;
+  captchaCode?: string;
 }
 
 export interface RegisterRequest {
   username: string;
   email: string;
   password: string;
+  captchaId?: string;
+  captchaCode?: string;
 }
 
 export interface AuthResponse {
