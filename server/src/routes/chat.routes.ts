@@ -4,6 +4,7 @@ import { chatService } from '../services/chat.service';
 import { knowledgeService } from '../services/knowledge.service';
 import { hybridSearch } from '../rag/retriever';
 import { generateAnswer } from '../rag/generator';
+import { prisma } from '../lib/prisma';
 import { chat } from '../ai/bailian';
 import { cacheDelPattern } from '../cache/redis';
 import { publishDocumentProcessing } from '../queue/producer';
@@ -111,6 +112,10 @@ router.post('/:id/chat/sessions/:sid/messages', async (req: AuthRequest, res: Re
     let fullContent = '';
     let lastRefs: any = null;
     let lastUsage: any = null;
+    let clientClosed = false;
+
+    // 客户端断开连接时标记，停止写入和 LLM 生成
+    req.on('close', () => { clientClosed = true; });
 
     try {
       for await (const event of generateAnswer({
@@ -121,9 +126,11 @@ router.post('/:id/chat/sessions/:sid/messages', async (req: AuthRequest, res: Re
       })) {
         if (event.type === 'chunk') {
           fullContent += event.content!;
-          res.write(
-            `data: ${JSON.stringify({ type: 'chunk', content: event.content, is_end: false })}\n\n`,
-          );
+          if (!clientClosed) {
+            res.write(
+              `data: ${JSON.stringify({ type: 'chunk', content: event.content, is_end: false })}\n\n`,
+            );
+          }
         } else if (event.type === 'done') {
           lastRefs = event.references;
           lastUsage = event.usage;
@@ -166,9 +173,6 @@ router.post('/:id/chat/extract', async (req: AuthRequest, res: Response, next: N
     await knowledgeService.getKB(kbId, userId);
 
     // 2. 收集对话消息
-    const { PrismaClient } = await import('@prisma/client');
-    const prisma = new PrismaClient();
-
     type ChatMessage = { role: string; content: string; createdAt: Date; sessionId: string };
     const allMessages = await prisma.chatMessage.findMany({
       where: sessionId

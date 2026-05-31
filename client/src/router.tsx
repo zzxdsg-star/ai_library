@@ -1,16 +1,33 @@
+import { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { Spin } from 'antd';
 import Layout from './components/Layout';
 import { AuthGuard } from './components/AuthGuard';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import KnowledgeBaseList from './pages/KnowledgeBaseList';
-import KnowledgeEntryList from './pages/KnowledgeEntryList';
-import ChatPage from './pages/ChatPage';
-import AnalyticsPage from './pages/AnalyticsPage';
+
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const KnowledgeBaseList = lazy(() => import('./pages/KnowledgeBaseList'));
+const KnowledgeEntryList = lazy(() => import('./pages/KnowledgeEntryList'));
+const ChatPage = lazy(() => import('./pages/ChatPage'));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
+
+function Lazy({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense
+      fallback={
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+          <Spin size="large" />
+        </div>
+      }
+    >
+      {children}
+    </Suspense>
+  );
+}
 
 export const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
-  { path: '/register', element: <RegisterPage /> },
+  { path: '/login', element: <Lazy><LoginPage /></Lazy> },
+  { path: '/register', element: <Lazy><RegisterPage /></Lazy> },
   {
     path: '/',
     element: (
@@ -19,11 +36,11 @@ export const router = createBrowserRouter([
       </AuthGuard>
     ),
     children: [
-      { index: true, element: <KnowledgeBaseList /> },
-      { path: 'knowledge-bases/:id', element: <KnowledgeEntryList /> },
-      { path: 'knowledge-bases/:id/chat', element: <ChatPage /> },
-      { path: 'knowledge-bases/:id/chat/:sid', element: <ChatPage /> },
-      { path: 'analytics', element: <AnalyticsPage /> },
+      { index: true, element: <Lazy><KnowledgeBaseList /></Lazy> },
+      { path: 'knowledge-bases/:id', element: <Lazy><KnowledgeEntryList /></Lazy> },
+      { path: 'knowledge-bases/:id/chat', element: <Lazy><ChatPage /></Lazy> },
+      { path: 'knowledge-bases/:id/chat/:sid', element: <Lazy><ChatPage /></Lazy> },
+      { path: 'analytics', element: <Lazy><AnalyticsPage /></Lazy> },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { List, Button, Typography, Popconfirm } from 'antd';
 import {
   PlusOutlined,
@@ -18,7 +19,7 @@ interface Props {
  * 左侧会话列表。
  * 悬停时柔和背景变化，当前选中项金色左边框高亮。
  */
-export default function SessionList({
+const SessionList = memo(function SessionList({
   sessions,
   currentId,
   onSelect,
@@ -111,4 +112,6 @@ export default function SessionList({
       </div>
     </div>
   );
-}
+});
+
+export default SessionList;

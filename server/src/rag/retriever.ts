@@ -1,8 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { embedText } from './embedder';
-import { cacheDelPattern } from '../cache/redis';
-
-const prisma = new PrismaClient();
 
 /**
  * 单条检索结果。
@@ -139,16 +136,12 @@ export async function hybridSearch(
 
   const results = ranked.map((r) => r.result);
 
-  // 4. 命中计数 +1（用于热度统计加分项）
+  // 4. 命中计数 +1（用于热度统计）
   if (results.length > 0) {
-    const ids = results.map((r) => `'${r.chunkId}'::uuid`).join(',');
-    await prisma.$executeRawUnsafe(`
-      UPDATE knowledge_chunk
-      SET hit_count = hit_count + 1
-      WHERE id IN (${ids})
-    `);
-    // 每次检索命中都清统计缓存，下次请求拿到最新热度数据
-    await cacheDelPattern('analytics:*').catch(() => {});
+    await prisma.knowledgeChunk.updateMany({
+      where: { id: { in: results.map((r) => r.chunkId) } },
+      data: { hitCount: { increment: 1 } },
+    });
   }
 
   return results;

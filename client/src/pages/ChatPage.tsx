@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Typography, App, Tooltip } from 'antd';
@@ -22,9 +22,9 @@ export default function ChatPage() {
   const { id, sid } = useParams<{ id: string; sid?: string }>();
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  const { sessions, currentSessionId, messages } = useSelector(
-    (s: RootState) => s.chat,
-  );
+  const sessions = useSelector((s: RootState) => s.chat.sessions);
+  const currentSessionId = useSelector((s: RootState) => s.chat.currentSessionId);
+  const messages = useSelector((s: RootState) => s.chat.messages);
   const { streaming, streamContent, startStream } = useSSE();
   const { message } = App.useApp();
   const [extracting, setExtracting] = useState(false);
@@ -60,20 +60,20 @@ export default function ChatPage() {
     }
   }, [sid, id, dispatch]);
 
-  const handleCreateSession = async () => {
+  const handleCreateSession = useCallback(async () => {
     const res = await dispatch(createSession(id!)).unwrap();
     navigate(`/knowledge-bases/${id}/chat/${res.id}`);
-  };
+  }, [id, dispatch, navigate]);
 
-  const handleSelectSession = (sid: string) => {
+  const handleSelectSession = useCallback((sid: string) => {
     navigate(`/knowledge-bases/${id}/chat/${sid}`);
-  };
+  }, [id, navigate]);
 
-  const handleDeleteSession = async (sid: string) => {
+  const handleDeleteSession = useCallback(async (sid: string) => {
     await dispatch(deleteSession({ kbId: id!, sid }));
-  };
+  }, [id, dispatch]);
 
-  const handleSend = async (content: string) => {
+  const handleSend = useCallback(async (content: string) => {
     let sessionId = currentSessionId;
     if (!sessionId) {
       const res = await dispatch(createSession(id!)).unwrap();
@@ -99,7 +99,7 @@ export default function ChatPage() {
       dispatch(fetchMessages({ kbId: id!, sid: sessionId }));
       dispatch(fetchSessions(id!));
     }
-  };
+  }, [id, currentSessionId, dispatch, navigate, startStream]);
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 116px)', gap: 0, margin: -28 }}>

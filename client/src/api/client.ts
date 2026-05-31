@@ -23,12 +23,13 @@ client.interceptors.request.use((config) => {
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isAuthEndpoint = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/register');
+    if (error.response?.status === 401 && !isAuthEndpoint) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
+      return Promise.reject(new Error('请先登录'));
     }
-    // 提取服务端返回的错误消息，避免前端拿到 axios 默认的 "Request failed with status code 400"
     const message =
       error.response?.data?.message ||
       error.response?.data?.error ||

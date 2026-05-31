@@ -1,10 +1,9 @@
-import { PrismaClient, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { AppError } from '../errors/app-error';
 import { ErrorCodes } from '../errors/error-codes';
 import { cacheGet, cacheSet, cacheDel, cacheDelPattern } from '../cache/redis';
 import { deleteImage } from '../storage/oss';
-
-const prisma = new PrismaClient();
 
 /**
  * 知识管理服务：知识库 CRUD + 知识条目 CRUD。

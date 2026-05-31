@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction } from 'express';
 import multer from 'multer';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { authMiddleware, AuthRequest } from '../middleware/auth.middleware';
 import { knowledgeService } from '../services/knowledge.service';
 import { AppError } from '../errors/app-error';
@@ -13,8 +13,6 @@ import { publishDocumentProcessing } from '../queue/producer';
 import { cacheDelPattern } from '../cache/redis';
 import { describeImage } from '../ai/bailian';
 import { uploadImage } from '../storage/oss';
-
-const prisma = new PrismaClient();
 
 const router = Router();
 router.use(authMiddleware);

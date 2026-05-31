@@ -4,7 +4,7 @@
  * 数据库：PostgreSQL + pgvector 扩展
  * 命名约定：数据库字段 snake_case（@map 映射），TypeScript 模型 camelCase
  *
- * pgvector 向量维度 1536，对应阿里云百炼 text-embedding-v2 模型输出维度。
+ * pgvector 向量维度 1024，对应阿里云百炼 text-embedding-v3 模型输出维度。
  */
 
 generator client {
@@ -72,6 +72,8 @@ model KnowledgeEntry {
   chunks KnowledgeChunk[]
 
   @@index([kbId, status])
+  @@index([kbId, title])
+  @@index([kbId, sourceFileHash])
   @@map("knowledge_entry")
 }
 
@@ -99,7 +101,7 @@ model KnowledgeChunk {
   entryId    String   @map("entry_id") @db.Uuid
   chunkIndex Int      @map("chunk_index")
   content    String   @db.Text
-  embedding  Unsupported("vector(1536)")
+  embedding  Unsupported("vector(1024)")
   hitCount   Int      @default(0) @map("hit_count")
   createdAt  DateTime @default(now()) @map("created_at")
 
@@ -138,6 +140,7 @@ model ChatMessage {
 
   session ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
+  @@index([sessionId, createdAt])
   @@map("chat_message")
 }
 

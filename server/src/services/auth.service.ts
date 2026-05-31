@@ -1,11 +1,9 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { AppError } from '../errors/app-error';
 import { ErrorCodes } from '../errors/error-codes';
-
-const prisma = new PrismaClient();
 
 /**
  * 认证服务：注册、登录、获取当前用户。

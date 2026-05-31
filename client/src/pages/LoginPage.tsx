@@ -20,7 +20,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (token) navigate('/', { replace: true });
-  }, [token, navigate]);
+  }, [token, navigate, message]);
 
   const fetchCaptcha = useCallback(async () => {
     setCaptchaLoading(true);

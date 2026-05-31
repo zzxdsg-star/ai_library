@@ -1,9 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { AppError } from '../errors/app-error';
 import { ErrorCodes } from '../errors/error-codes';
 import { cacheGet, cacheSet, cacheDel, cacheDelPattern } from '../cache/redis';
-
-const prisma = new PrismaClient();
 
 /**
  * 对话服务：会话 CRUD + 消息存储。

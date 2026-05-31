@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { cacheGet, cacheSet } from '../cache/redis';
-
-const prisma = new PrismaClient();
 
 /**
  * 统计分析服务：热度排行 + 知识库活跃度 + 单库统计。

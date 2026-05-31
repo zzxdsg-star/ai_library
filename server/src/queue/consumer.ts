@@ -1,12 +1,11 @@
 import amqp from 'amqplib';
 import { config } from '../config';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { chunkText } from '../rag/chunker';
 import { embedAndStoreChunks } from '../rag/embedder';
 import { cacheDelPattern } from '../cache/redis';
 
 const QUEUE_NAME = 'document_processing';
-const prisma = new PrismaClient();
 
 /**
  * RabbitMQ Consumer：消费文档处理任务。

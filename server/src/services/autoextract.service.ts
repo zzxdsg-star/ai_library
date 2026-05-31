@@ -1,11 +1,9 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import schedule from 'node-schedule';
 import { chat } from '../ai/bailian';
 import { computeBufferHash } from '../ingestion/parser';
 import { cacheGet, cacheSet, cacheDelPattern } from '../cache/redis';
 import { publishDocumentProcessing } from '../queue/producer';
-
-const prisma = new PrismaClient();
 
 /**
  * 自动知识提炼服务。

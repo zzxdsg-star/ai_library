@@ -78,6 +78,11 @@ const knowledgeEntrySlice = createSlice({
   name: 'knowledgeEntry',
   initialState,
   reducers: {
+    resetList(state) {
+      state.list = [];
+      state.total = 0;
+      state.loading = true;
+    },
     setSearch(state, action) {
       state.search = action.payload;
       state.page = 1;
@@ -123,6 +128,6 @@ const knowledgeEntrySlice = createSlice({
   },
 });
 
-export const { setSearch, setStatusFilter, setPage } =
+export const { resetList, setSearch, setStatusFilter, setPage } =
   knowledgeEntrySlice.actions;
 export default knowledgeEntrySlice.reducer;

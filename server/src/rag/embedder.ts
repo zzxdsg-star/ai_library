@@ -1,7 +1,5 @@
 import { getEmbedding, getEmbeddings } from '../ai/bailian';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 /**
  * 单条文本向量化（委托 LangChain OpenAIEmbeddings）。
@@ -28,13 +26,18 @@ export async function embedAndStoreChunks(
   const texts = chunks.map((c) => c.content);
   const embeddings = await getEmbeddings(texts);
 
-  await prisma.$transaction(
-    chunks.map((chunk, i) =>
-      prisma.$executeRaw`
-        INSERT INTO knowledge_chunk (id, entry_id, chunk_index, content, embedding, hit_count, created_at)
-        VALUES (gen_random_uuid(), ${entryId}::uuid, ${chunk.index}, ${chunk.content},
-                ${embeddings[i]}::vector, 0, NOW())
-      `,
-    ),
+  if (chunks.length === 0) return;
+
+  // 单条多行 INSERT，embedding 直接格式化为 pgvector 字面量
+  const rows = chunks
+    .map((chunk, i) => {
+      const vecStr = `[${embeddings[i].join(',')}]`;
+      const esc = chunk.content.replace(/'/g, "''");
+      return `(gen_random_uuid(), '${entryId}'::uuid, ${chunk.index}, '${esc}', '${vecStr}'::vector, 0, NOW())`;
+    })
+    .join(',\n');
+
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO knowledge_chunk (id, entry_id, chunk_index, content, embedding, hit_count, created_at) VALUES ${rows}`,
   );
 }

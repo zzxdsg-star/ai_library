@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -11,7 +11,7 @@ import ReactECharts from 'echarts-for-react';
 import type { AppDispatch, RootState } from '../store';
 import {
   fetchEntries, deleteEntry, toggleEntryStatus,
-  setSearch, setStatusFilter, setPage,
+  setSearch, setStatusFilter, setPage, resetList,
 } from '../store/knowledgeEntrySlice';
 import EntryEditor from '../components/knowledge/EntryEditor';
 import FileUpload from '../components/knowledge/FileUpload';
@@ -34,17 +34,33 @@ export default function KnowledgeEntryList() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
 
-  useEffect(() => { if (id) dispatch(fetchEntries({ kbId: id, page, search, status: statusFilter })); },
-    [id, page, search, statusFilter, dispatch]);
+  useEffect(() => {
+    dispatch(resetList());
+    if (id) dispatch(fetchEntries({ kbId: id, page, search, status: statusFilter }));
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const prevStatusMap = useRef<Map<string, string>>(new Map());
 
+  // 轮询只在有待处理条目时运行，参数用 ref 存最新值
+  const pollRef = useRef({ page, search, status: statusFilter });
+  pollRef.current = { page, search, status: statusFilter };
+  const hasPendingRef = useRef(false);
+
   useEffect(() => {
-    const hasPending = list.some((e) => e.processing_status === 'PENDING' || e.processing_status === 'PROCESSING');
-    if (!hasPending || !id) return;
-    const timer = setInterval(() => { dispatch(fetchEntries({ kbId: id, page, search, status: statusFilter })); }, 3000);
+    hasPendingRef.current = list.some(
+      (e) => e.processing_status === 'PENDING' || e.processing_status === 'PROCESSING',
+    );
+  });
+
+  useEffect(() => {
+    if (!id) return;
+    const timer = setInterval(() => {
+      if (!hasPendingRef.current) return;
+      const p = pollRef.current;
+      dispatch(fetchEntries({ kbId: id, page: p.page, search: p.search, status: p.status }));
+    }, 3000);
     return () => clearInterval(timer);
-  }, [list, id, page, search, statusFilter, dispatch]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     for (const entry of list) {
@@ -95,7 +111,7 @@ export default function KnowledgeEntryList() {
     await dispatch(toggleEntryStatus({ kbId: id!, eid: entry.id, status: newStatus }));
   };
 
-  const columns = [
+  const columns = useMemo(() => [
     { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true,
       render: (t: string, record: KnowledgeEntry) => (
         <a style={{ fontWeight: 500 }} onClick={() => handleOpenDetail(record)}>{t}</a>
@@ -133,7 +149,7 @@ export default function KnowledgeEntryList() {
     { title: '操作', key: 'actions', width: 220, align: 'center' as const,
       render: (_: unknown, record: KnowledgeEntry) => {
         const ext = (record.source_file_name || '').split('.').pop()?.toLowerCase();
-        const noExt = !ext; // 手动录入，无后缀
+        const noExt = !ext;
         const canPreview = noExt || ext === 'md' || ext === 'txt' || ext === 'png' || ext === 'jpg' || ext === 'jpeg';
         const noPreview = ext === 'csv' || ext === 'xlsx' || ext === 'pdf' || ext === 'docx';
         return (
@@ -152,7 +168,7 @@ export default function KnowledgeEntryList() {
         );
       },
     },
-  ];
+  ], []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div>
@@ -190,8 +206,8 @@ export default function KnowledgeEntryList() {
               </div>
               <div style={{ background: '#fff', borderRadius: 10, padding: '0 4px', boxShadow: '0 4px 16px rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.03)' }}>
                 <Table dataSource={list} columns={columns} rowKey="id" loading={loading}
-                  rowSelection={{ selectedRowKeys, onChange: (keys) => setSelectedRowKeys(keys as string[]) }}
-                  pagination={{ total, current: page, pageSize: 10, onChange: (p) => dispatch(setPage(p)), showTotal: (t) => `共 ${t} 条` }} />
+                  rowSelection={useMemo(() => ({ selectedRowKeys, onChange: (keys: React.Key[]) => setSelectedRowKeys(keys as string[]) }), [selectedRowKeys])}
+                  pagination={useMemo(() => ({ total, current: page, pageSize: 10, onChange: (p: number) => dispatch(setPage(p)), showTotal: (t: number) => `共 ${t} 条` }), [total, page, dispatch])} />
               </div>
             </>
           ),

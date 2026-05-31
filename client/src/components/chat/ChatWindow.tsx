@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import { Input, Button, Typography } from 'antd';
 import { SendOutlined, RobotOutlined } from '@ant-design/icons';
 import type { ChatMessage } from 'shared';
@@ -15,7 +15,7 @@ interface Props {
  * 聊天窗口 — 消息列表 + 流式输出 + 底部输入区。
  * 空状态展示品牌欢迎页，消息自动滚动到底部。
  */
-export default function ChatWindow({
+const ChatWindow = memo(function ChatWindow({
   messages,
   streaming,
   streamContent,
@@ -147,4 +147,6 @@ export default function ChatWindow({
       </div>
     </div>
   );
-}
+});
+
+export default ChatWindow;

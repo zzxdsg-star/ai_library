@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Avatar, Typography } from 'antd';
 import { UserOutlined, RobotOutlined } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
@@ -9,7 +10,7 @@ interface Props {
   isStreaming?: boolean;
 }
 
-export default function MessageBubble({ message, isStreaming }: Props) {
+const MessageBubble = memo(function MessageBubble({ message, isStreaming }: Props) {
   const isUser = message.role === 'USER';
 
   return (
@@ -72,4 +73,6 @@ export default function MessageBubble({ message, isStreaming }: Props) {
       </div>
     </div>
   );
-}
+});
+
+export default MessageBubble;
