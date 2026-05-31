@@ -82,17 +82,14 @@ node vision.js "<图片路径>" "用中文描述这张图片"
 
 用户直接发图片，自动识图，无需手动打命令。
 
-## 当前状态（2026-05-30）
+## 当前状态（2026-05-31）
 
 - 全部 21 个 Task + 4 个加分项已全部完成
-- Redis 缓存覆盖全部场景（知识库列表/详情、条目列表/详情、会话列表、消息历史、分析统计、自动提炼时间戳），共 8 种 Key
-- 热度统计与可视化（ECharts 柱状图+环形图+概览卡片，全局页+单库 Tab，5 分钟刷新）
-- 多模态：图片 OSS 存储 + qwen-vl-plus 视觉识别 + CSV/Excel Markdown table + Markdown 分栏编辑器
-- 验证码登录注册（数学 SVG + Redis 5 分钟过期 + 一次性使用）
-- 自动知识提炼（手动 + node-schedule 凌晨 4:30 定时，分会话并行提炼，SHA256+标题去重，200 字过滤）
-- 条目详情抽屉、批量删除、预览权限控制
-- embedding 模型已升级为 text-embedding-v3（1024 维）
+- 前端性能优化：路由懒加载、React.memo/useMemo/useCallback、轮询优化、Redux selector 拆分
+- 后端优化：PrismaClient 单例统一、SSE 断开保护、DB 索引、多行 INSERT
+- Redis 缓存覆盖 8 种 Key，analytics 缓存不再被每次检索清掉
+- 验证码登录 + 未登录弹红色提示 + 401 拦截器修复
+- 权限校验：编辑时文件后缀锁死
 
 ### 延后迭代
 - PDF/DOCX 内嵌图片识别（pdfjs-dist v5 兼容问题）
-- **延后迭代**：PDF/DOCX 内嵌图片识别（pdfjs-dist v5 兼容问题）
