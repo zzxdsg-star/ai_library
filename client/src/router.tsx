@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter } from 'react-router-dom';
 import { Spin } from 'antd';
 import Layout from './components/Layout';
 import { AuthGuard } from './components/AuthGuard';
