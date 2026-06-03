@@ -10,6 +10,7 @@ const KnowledgeBaseList = lazy(() => import('./pages/KnowledgeBaseList'));
 const KnowledgeEntryList = lazy(() => import('./pages/KnowledgeEntryList'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 function Lazy({ children }: { children: React.ReactNode }) {
   return (
@@ -43,5 +44,5 @@ export const router = createBrowserRouter([
       { path: 'analytics', element: <Lazy><AnalyticsPage /></Lazy> },
     ],
   },
-  { path: '*', element: <Navigate to="/" replace /> },
+  { path: '*', element: <Lazy><NotFound /></Lazy> },
 ]);
