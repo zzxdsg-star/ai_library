@@ -19,7 +19,7 @@
 | 数据库 | PostgreSQL + pgvector（主存储 + 向量 + 全文搜索） |
 | 缓存 | Redis（热点数据、Session） |
 | 消息队列 | RabbitMQ（文档入库异步分块+Embedding） |
-| AI | 阿里云百炼（Embedding: text-embedding-v2, LLM: qwen-plus） |
+| AI | 阿里云百炼（Embedding: text-embedding-v3, LLM: qwen-plus, Vision: qwen-vl-plus） |
 | RAG 框架 | LangChain（ChatOpenAI + OpenAIEmbeddings + RecursiveCharacterTextSplitter） |
 
 ## 项目结构
@@ -84,12 +84,26 @@ node vision.js "<图片路径>" "用中文描述这张图片"
 
 ## 当前状态（2026-05-31）
 
-- 全部 21 个 Task + 4 个加分项已全部完成
-- 前端性能优化：路由懒加载、React.memo/useMemo/useCallback、轮询优化、Redux selector 拆分
-- 后端优化：PrismaClient 单例统一、SSE 断开保护、DB 索引、多行 INSERT
-- Redis 缓存覆盖 8 种 Key，analytics 缓存不再被每次检索清掉
-- 验证码登录 + 未登录弹红色提示 + 401 拦截器修复
-- 权限校验：编辑时文件后缀锁死
+全部 21 个 Task + 4 个加分项完成，前后端优化完毕，无 TypeScript 错误。
 
 ### 延后迭代
 - PDF/DOCX 内嵌图片识别（pdfjs-dist v5 兼容问题）
+
+## 面试关键代码索引
+
+**前端核心**：
+- SSE 流式：[client.ts:78-118](client/src/api/client.ts) postStream + [useSSE.ts](client/src/hooks/useSSE.ts)
+- React.memo：[MessageBubble.tsx](client/src/components/chat/MessageBubble.tsx) / [ChatWindow.tsx](client/src/components/chat/ChatWindow.tsx) / [SessionList.tsx](client/src/components/chat/SessionList.tsx)
+- useCallback/useMemo：[ChatPage.tsx:63-102](client/src/pages/ChatPage.tsx) / [KnowledgeEntryList.tsx:100-157](client/src/pages/KnowledgeEntryList.tsx)
+- 路由懒加载：[router.tsx](client/src/router.tsx)
+- 401 拦截：[client.ts:23-35](client/src/api/client.ts)
+
+**后端核心**：
+- 混合检索 RRF：[retriever.ts](server/src/rag/retriever.ts)
+- 回答生成：[generator.ts](server/src/rag/generator.ts)
+- SSE 推送：[chat.routes.ts:78-151](server/src/routes/chat.routes.ts)
+- 知识提炼：[chat.routes.ts:159-250](server/src/routes/chat.routes.ts)
+- 自动提炼：[autoextract.service.ts](server/src/services/autoextract.service.ts)
+- embedding 批量：[bailian.ts:65-76](server/src/ai/bailian.ts)
+- Prisma 单例：[lib/prisma.ts](server/src/lib/prisma.ts)
+- Redis 缓存：[cache/redis.ts](server/src/cache/redis.ts)
