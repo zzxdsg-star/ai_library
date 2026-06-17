@@ -3,7 +3,7 @@ import type { ApiResponse } from 'shared';
 
 const client = axios.create({
   baseURL: '/api',
-  timeout: 30000,
+  timeout: 60000,
 });
 
 /**

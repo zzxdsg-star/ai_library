@@ -191,8 +191,12 @@ export default function KnowledgeEntryList() {
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, background: '#fff', padding: '14px 18px', borderRadius: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.06)', border: '1px solid rgba(184,134,11,0.06)' }}>
                 <Space>
-                  <Input.Search placeholder="搜索条目..." allowClear style={{ width: 280 }} value={search} onChange={(e) => dispatch(setSearch(e.target.value))} />
-                  <Select placeholder="状态筛选" allowClear style={{ width: 130 }} value={statusFilter || undefined} onChange={(v) => dispatch(setStatusFilter(v || ''))} options={[{ value: 'ENABLED', label: '可用' }, { value: 'DISABLED', label: '不可用' }]} />
+                  <Input.Search placeholder="搜索条目..." allowClear style={{ width: 280 }} value={search}
+                    onChange={(e) => dispatch(setSearch(e.target.value))}
+                    onSearch={(val) => dispatch(fetchEntries({ kbId: id!, page: 1, search: val, status: statusFilter }))} />
+                  <Select placeholder="状态筛选" allowClear style={{ width: 130 }} value={statusFilter || undefined}
+                    onChange={(v) => { dispatch(setStatusFilter(v || '')); dispatch(fetchEntries({ kbId: id!, page: 1, search, status: v || '' })); }}
+                    options={[{ value: 'ENABLED', label: '可用' }, { value: 'DISABLED', label: '不可用' }]} />
                   {selectedRowKeys.length > 0 && (
                     <Button danger type="primary" onClick={handleBatchDelete}>
                       删除选中 ({selectedRowKeys.length})

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button, Typography, App, Tooltip } from 'antd';
@@ -25,7 +25,9 @@ export default function ChatPage() {
   const sessions = useSelector((s: RootState) => s.chat.sessions);
   const currentSessionId = useSelector((s: RootState) => s.chat.currentSessionId);
   const messages = useSelector((s: RootState) => s.chat.messages);
-  const { streaming, streamContent, startStream } = useSSE();
+  const { streaming, streamContent, startStream, cancelStream } = useSSE();
+  const currentSessionIdRef = useRef(currentSessionId);
+  currentSessionIdRef.current = currentSessionId;
   const { message } = App.useApp();
   const [extracting, setExtracting] = useState(false);
 
@@ -66,15 +68,16 @@ export default function ChatPage() {
   }, [id, dispatch, navigate]);
 
   const handleSelectSession = useCallback((sid: string) => {
+    cancelStream();
     navigate(`/knowledge-bases/${id}/chat/${sid}`);
-  }, [id, navigate]);
+  }, [id, navigate, cancelStream]);
 
   const handleDeleteSession = useCallback(async (sid: string) => {
     await dispatch(deleteSession({ kbId: id!, sid }));
   }, [id, dispatch]);
 
   const handleSend = useCallback(async (content: string) => {
-    let sessionId = currentSessionId;
+    let sessionId = currentSessionIdRef.current;
     if (!sessionId) {
       const res = await dispatch(createSession(id!)).unwrap();
       sessionId = res.id;
@@ -95,11 +98,12 @@ export default function ChatPage() {
     const generator = chatApi.sendMessage(id!, sessionId, content);
     const fullContent = await startStream(generator);
 
-    if (fullContent) {
+    // 流结束后如果用户已切到其他会话，不刷新消息，避免覆写 Redux 数据
+    if (fullContent && currentSessionIdRef.current === sessionId) {
       dispatch(fetchMessages({ kbId: id!, sid: sessionId }));
       dispatch(fetchSessions(id!));
     }
-  }, [id, currentSessionId, dispatch, navigate, startStream]);
+  }, [id, dispatch, navigate, startStream]);
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 116px)', gap: 0, margin: -28 }}>

@@ -85,6 +85,35 @@ const ChatWindow = memo(function ChatWindow({
           ))
         )}
 
+        {/* 等待 AI 思考中 */}
+        {streaming && !streamContent && (
+          <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
+            <div
+              style={{
+                width: 36, height: 36, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #4a9e6e, #5bb87a)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, boxShadow: '0 2px 8px rgba(74,158,110,0.3)',
+              }}
+            >
+              <RobotOutlined style={{ fontSize: 18, color: '#fff' }} />
+            </div>
+            <div
+              style={{
+                padding: '12px 18px',
+                borderRadius: '14px 14px 14px 4px',
+                background: '#f5f3ef',
+                borderLeft: '3px solid #b8860b',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <span className="dot-pulse" style={{ width: 8, height: 8, borderRadius: '50%', background: '#b8860b', display: 'inline-block' }} />
+              <span className="dot-pulse" style={{ width: 8, height: 8, borderRadius: '50%', background: '#b8860b', display: 'inline-block', animationDelay: '0.15s' }} />
+              <span className="dot-pulse" style={{ width: 8, height: 8, borderRadius: '50%', background: '#b8860b', display: 'inline-block', animationDelay: '0.3s' }} />
+            </div>
+          </div>
+        )}
+
         {/* 流式生成中的临时气泡 */}
         {streaming && streamContent && (
           <MessageBubble

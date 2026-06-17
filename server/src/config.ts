@@ -12,7 +12,7 @@ export const config = {
   bailian: {
     apiKey: process.env.BAILIAN_API_KEY || '',
     embeddingModel: 'text-embedding-v3',
-    llmModel: 'qwen-plus',
+    llmModel: 'qwen3.7-plus',
     visionModel: 'qwen-vl-plus',
   },
   oss: {
